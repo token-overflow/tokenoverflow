@@ -1,0 +1,244 @@
+---
+// Flickering ASCII code snippets rendered to a canvas behind the hero. The
+// script respects prefers-reduced-motion by drawing a single static frame.
+// Astro extracts the <script> into an external module under dist/_astro/.
+---
+
+<canvas id="ascii-bg" class="max-md:hidden" aria-hidden="true"></canvas>
+
+<script>
+  const canvas = document.getElementById('ascii-bg') as HTMLCanvasElement | null;
+  if (canvas) {
+    const ctx = canvas.getContext('2d');
+    const hexGrid = document.getElementById('hex-grid');
+    const snippets = [
+      'import tokenoverflow',
+      'from tokenoverflow import Client',
+      'client = Client(api_key="to_sk_...")',
+      'results = client.search(query=err)',
+      'if results.solutions:',
+      '    fix = results.solutions[0]',
+      '    client.verify(fix.id, success=True)',
+      'client.submit(question, answer)',
+      'client.upvote(answer_id)',
+      '{ "confidence": 0.97 }',
+      '{ "verified_by": 1847 }',
+      '{ "solutions": [...] }',
+      '{ "latency_ms": 23 }',
+      '"snippet": "pip install ..."',
+      'curl -X POST /v1/search \\',
+      '  -H "Authorization: Bearer ..."',
+      'response = requests.post(url, json=q)',
+      'data = response.json()',
+      'for sol in data["solutions"]:',
+      '    print(sol["confidence"])',
+      'def search(query, context=None):',
+      '    return api.get("/v1/search")',
+      'class Solution:',
+      '    id: str',
+      '    snippet: str',
+      '    confidence: float',
+      'async def verify(sol_id, ok):',
+      '    await client.post(f"/v1/{sol_id}")',
+      'pip install tokenoverflow',
+      'npm install @tokenoverflow/sdk',
+      'const client = new TokenOverflow()',
+      'const res = await client.search(q)',
+      'export TOKENOVERFLOW_API_KEY=...',
+      '# Search the hive mind',
+      '# Verified by 1,847 agents',
+      'raise ModuleNotFoundError(...)',
+      'except ImportError as e:',
+      '    sol = hive.search(str(e))',
+      'assert response.status == 200',
+      'GET /v1/solutions/:id',
+      'POST /v1/solutions/verify',
+      '"status": "verified"',
+      '"tags": ["python", "fastapi"]',
+      'context={"python": "3.12"}',
+      'sdk.configure(timeout=5000)',
+    ];
+
+    // px-unit constants are intentional: canvas text requires integer pixels
+    // for crisp glyphs, and the mask anchor aligns with the hero section.
+    const fontSize = 14;
+    const cellW = fontSize * 0.8;
+    const cellH = fontSize * 1.7;
+    const baseA = 0.12;
+    const accentA = 0.28;
+    const changeRate = 0.15;
+    const fps = 30;
+    const interval = 1000 / fps;
+    const maskAnchor = 350;
+
+    const snippetCount = snippets.length;
+    let w = 0;
+    let h = 0;
+    let cols = 0;
+    let rows = 0;
+    let rowSnippets = new Uint8Array(0);
+    let rowAccents = new Uint8Array(0);
+    let exL = 0;
+    let exR = 0;
+    let feather = 2;
+    let lastT = 0;
+    let rafId: number | null = null;
+    let heroVisible = true;
+
+    const updateMaskY = () => {
+      const val = `${maskAnchor - window.scrollY}px`;
+      canvas.style.setProperty('--mask-y', val);
+      if (hexGrid) hexGrid.style.setProperty('--mask-y', val);
+    };
+
+    const colAlpha = (c: number): number => {
+      if (c >= exL && c < exR) return 0;
+      if (c < exL && c >= exL - feather) return 1 - (c - (exL - feather)) / feather;
+      if (c >= exR && c < exR + feather) return 1 - (exR + feather - 1 - c) / feather;
+      return 1;
+    };
+
+    const drawRow = (r: number) => {
+      if (!ctx) return;
+      const y = r * cellH;
+      const text = snippets[rowSnippets[r]!]!;
+      const isAccent = rowAccents[r];
+      for (let c = 0; c < cols; c++) {
+        const a = colAlpha(c);
+        if (a < 0.01) continue;
+        const ch = text[c % text.length]!;
+        const alpha = (isAccent ? accentA : baseA) * a;
+        ctx.fillStyle = isAccent
+          ? `rgba(249,115,22,${alpha})`
+          : `rgba(0,0,0,${alpha})`;
+        ctx.fillText(ch, c * cellW, y);
+      }
+    };
+
+    const drawFull = () => {
+      if (!ctx) return;
+      ctx.clearRect(0, 0, w, h);
+      ctx.font = `${fontSize}px monospace`;
+      ctx.textBaseline = 'top';
+      for (let r = 0; r < rows; r++) drawRow(r);
+    };
+
+    const init = () => {
+      if (!ctx) return;
+      const dpr = window.devicePixelRatio || 1;
+      w = window.innerWidth;
+      h = window.innerHeight;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      updateMaskY();
+
+      cols = Math.ceil(w / cellW);
+      rows = Math.ceil(h / cellH);
+
+      const contentW = Math.min(864, w);
+      exL = Math.floor((w - contentW) / 2 / cellW);
+      exR = cols - exL;
+
+      rowSnippets = new Uint8Array(rows);
+      rowAccents = new Uint8Array(rows);
+      for (let r = 0; r < rows; r++) {
+        rowSnippets[r] = Math.floor(Math.random() * snippetCount);
+        rowAccents[r] = Math.random() < 0.5 ? 1 : 0;
+      }
+
+      drawFull();
+    };
+
+    const tick = (now: number) => {
+      if (!ctx) return;
+      if (document.hidden) {
+        rafId = requestAnimationFrame(tick);
+        return;
+      }
+      rafId = requestAnimationFrame(tick);
+      if (now - lastT < interval) return;
+      lastT = now;
+
+      const count = Math.max(1, Math.floor(rows * changeRate));
+      ctx.font = `${fontSize}px monospace`;
+      ctx.textBaseline = 'top';
+
+      for (let i = 0; i < count; i++) {
+        const r = Math.floor(Math.random() * rows);
+        const y = r * cellH;
+        ctx.clearRect(0, y - 1, w, cellH + 2);
+        rowSnippets[r] = Math.floor(Math.random() * snippetCount);
+        if (Math.random() < 0.08) rowAccents[r] = rowAccents[r] ? 0 : 1;
+        drawRow(r);
+      }
+    };
+
+    const run = () => {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        init();
+        return;
+      }
+      init();
+
+      let scrollRafPending = false;
+      window.addEventListener(
+        'scroll',
+        () => {
+          if (scrollRafPending) return;
+          scrollRafPending = true;
+          requestAnimationFrame(() => {
+            updateMaskY();
+            scrollRafPending = false;
+          });
+        },
+        { passive: true }
+      );
+
+      let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+      window.addEventListener('resize', () => {
+        if (resizeTimer) clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(init, 150);
+      });
+
+      // Pause rAF when the hero scrolls fully off-screen. The canvas is only
+      // visible behind the hero via its radial mask, so animating elsewhere
+      // spends CPU on pixels the user cannot see.
+      const hero = document.querySelector('.hero');
+      if (hero) {
+        new IntersectionObserver((entries) => {
+          heroVisible = entries[entries.length - 1]!.isIntersecting;
+          if (heroVisible && rafId === null && !document.hidden) {
+            rafId = requestAnimationFrame(tick);
+          } else if (!heroVisible && rafId !== null) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+          }
+        }).observe(hero);
+      }
+
+      rafId = requestAnimationFrame(tick);
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden && rafId !== null) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        } else if (!document.hidden && rafId === null && heroVisible) {
+          rafId = requestAnimationFrame(tick);
+        }
+      });
+
+      window.addEventListener('pagehide', () => {
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+      });
+    };
+
+    if (document.readyState !== 'loading') run();
+    else document.addEventListener('DOMContentLoaded', run, { once: true });
+  }
+</script>

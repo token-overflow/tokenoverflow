@@ -1,0 +1,7 @@
+use uuid::Uuid;
+
+/// System user UUID used before authentication is implemented (Phase 2).
+/// Matches the seeded system user in the init migration.
+pub const SYSTEM_USER_ID: Uuid = Uuid::from_bytes([
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+]);

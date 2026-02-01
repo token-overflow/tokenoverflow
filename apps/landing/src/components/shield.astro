@@ -1,0 +1,224 @@
+---
+// Content Safety section: decorative shield with particles and a pipeline
+// tablist of six security layers. The tablist itself is a separate component
+// so its bundled <script> stays scoped.
+import Pipeline from './pipeline.astro';
+---
+
+<section class="section bg-white border-y border-neutral-200 overflow-hidden" id="security">
+  <svg
+    class="shield-deco absolute top-[51%] max-md:top-[32rem] -left-56 w-[42rem] h-[50rem] max-md:w-[30rem] max-md:h-[36rem] -translate-y-1/2 pointer-events-none z-0 overflow-visible"
+    viewBox="0 0 400 480"
+    fill="none"
+    aria-hidden="true"
+  >
+    <defs>
+      <linearGradient
+        id="shield-grad"
+        x1="100"
+        y1="0"
+        x2="350"
+        y2="480"
+        gradientUnits="userSpaceOnUse"
+      >
+        <stop offset="0%" stop-color="#fdba74"></stop>
+        <stop offset="35%" stop-color="#fb923c"></stop>
+        <stop offset="65%" stop-color="#f97316"></stop>
+        <stop offset="100%" stop-color="#9a3412"></stop>
+      </linearGradient>
+      <radialGradient id="shield-highlight" cx="35%" cy="20%" r="50%">
+        <stop offset="0%" stop-color="white" stop-opacity="0.35"></stop>
+        <stop offset="100%" stop-color="white" stop-opacity="0"></stop>
+      </radialGradient>
+    </defs>
+    <path
+      class="shield-pulse"
+      d="M200 10 C200 10 370 50 370 50 C385 55 395 70 395 85 L395 250 C395 320 320 400 200 460 C80 400 5 320 5 250 L5 85 C5 70 15 55 30 50 C30 50 200 10 200 10 Z"
+      fill="url(#shield-grad)"></path>
+    <g class="shield-main">
+      <path
+        d="M200 30 C200 30 355 65 355 65 C367 69 375 80 375 92 L375 255 C375 318 308 388 200 440 C92 388 25 318 25 255 L25 92 C25 80 33 69 45 65 C45 65 200 30 200 30 Z"
+        fill="url(#shield-grad)"></path>
+      <path
+        d="M200 30 C200 30 355 65 355 65 C367 69 375 80 375 92 L375 255 C375 318 308 388 200 440 C92 388 25 318 25 255 L25 92 C25 80 33 69 45 65 C45 65 200 30 200 30 Z"
+        fill="url(#shield-highlight)"></path>
+      <path
+        d="M200 60 C200 60 340 90 340 90 C348 92 353 99 353 107 L353 250 C353 304 294 364 200 410 C106 364 47 304 47 250 L47 107 C47 99 52 92 60 90 C60 90 200 60 200 60 Z"
+        fill="none"
+        stroke="white"
+        stroke-opacity="0.15"
+        stroke-width="1.5"></path>
+      <path
+        d="M200 85 C200 85 325 112 325 112 C331 113 335 118 335 124 L335 248 C335 294 282 346 200 386 C118 346 65 294 65 248 L65 124 C65 118 69 113 75 112 C75 112 200 85 200 85 Z"
+        fill="none"
+        stroke="white"
+        stroke-opacity="0.08"
+        stroke-width="1"></path>
+    </g>
+  </svg>
+  <div
+    class="shield-particles absolute top-1/2 max-md:top-[32rem] -left-56 w-[42rem] h-[50rem] max-md:w-[30rem] max-md:h-[36rem] -translate-y-1/2 pointer-events-none z-0"
+    aria-hidden="true"
+  >
+    <div class="shield-particle"></div>
+    <div class="shield-particle"></div>
+    <div class="shield-particle"></div>
+    <div class="shield-particle"></div>
+    <div class="shield-particle"></div>
+    <div class="shield-particle"></div>
+    <div class="shield-particle"></div>
+    <div class="shield-particle"></div>
+  </div>
+  <div class="container relative z-[1]">
+    <div class="mb-10 text-center" data-fade-in>
+      <p class="font-mono text-xs font-semibold uppercase tracking-widest text-orange-700 mb-4">Content Safety</p>
+      <h2 class="text-[clamp(1.75rem,3vw+0.5rem,2.75rem)] font-extrabold tracking-tight leading-[1.12] mb-5">Guarded at every layer</h2>
+      <p class="text-[clamp(0.9375rem,1vw+0.25rem,1.0625rem)] leading-relaxed text-neutral-600 max-w-lg mx-auto">
+        6 independent security layers stand between a submission and your agent, protecting against
+        content poisoning.
+      </p>
+    </div>
+    <Pipeline />
+  </div>
+</section>
+
+<style>
+  .shield-deco :global(.shield-main) {
+    opacity: 0.15;
+    filter: drop-shadow(0 0 60px rgb(249 115 22 / 30%));
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  .shield-deco :global(.shield-pulse) {
+    opacity: 0.08;
+    animation: shield-pulse 4s ease-in-out infinite;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  @keyframes shield-pulse {
+    0%,
+    100% {
+      opacity: 0.06;
+      transform: scale(1);
+    }
+
+    50% {
+      opacity: 0.12;
+      transform: scale(1.03);
+    }
+  }
+
+  .shield-particle {
+    @apply absolute rounded-full opacity-0;
+
+    background: theme('colors.orange.500');
+    animation: particle-float linear infinite;
+  }
+
+  .shield-particle:nth-child(1) {
+    inline-size: 4px;
+    block-size: 4px;
+    inset-inline-start: 45%;
+    inset-block-end: 30%;
+    animation-duration: 6s;
+    animation-delay: 0s;
+  }
+
+  .shield-particle:nth-child(2) {
+    inline-size: 3px;
+    block-size: 3px;
+    inset-inline-start: 55%;
+    inset-block-end: 40%;
+    animation-duration: 8s;
+    animation-delay: 1s;
+  }
+
+  .shield-particle:nth-child(3) {
+    inline-size: 5px;
+    block-size: 5px;
+    inset-inline-start: 35%;
+    inset-block-end: 35%;
+    animation-duration: 7s;
+    animation-delay: 2s;
+  }
+
+  .shield-particle:nth-child(4) {
+    inline-size: 3px;
+    block-size: 3px;
+    inset-inline-start: 50%;
+    inset-block-end: 50%;
+    animation-duration: 9s;
+    animation-delay: 0.5s;
+  }
+
+  .shield-particle:nth-child(5) {
+    inline-size: 4px;
+    block-size: 4px;
+    inset-inline-start: 40%;
+    inset-block-end: 25%;
+    animation-duration: 5s;
+    animation-delay: 3s;
+  }
+
+  .shield-particle:nth-child(6) {
+    inline-size: 2px;
+    block-size: 2px;
+    inset-inline-start: 60%;
+    inset-block-end: 45%;
+    animation-duration: 7s;
+    animation-delay: 1.5s;
+  }
+
+  .shield-particle:nth-child(7) {
+    inline-size: 3px;
+    block-size: 3px;
+    inset-inline-start: 30%;
+    inset-block-end: 55%;
+    animation-duration: 6s;
+    animation-delay: 4s;
+  }
+
+  .shield-particle:nth-child(8) {
+    inline-size: 4px;
+    block-size: 4px;
+    inset-inline-start: 48%;
+    inset-block-end: 20%;
+    animation-duration: 8s;
+    animation-delay: 2.5s;
+  }
+
+  @keyframes particle-float {
+    0% {
+      opacity: 0;
+      transform: translateY(0) scale(0);
+    }
+
+    15% {
+      opacity: 0.4;
+      transform: translateY(-2rem) scale(1);
+    }
+
+    85% {
+      opacity: 0.15;
+      transform: translateY(-12rem) scale(0.6);
+    }
+
+    100% {
+      opacity: 0;
+      transform: translateY(-14rem) scale(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shield-deco :global(.shield-pulse) {
+      animation: none;
+    }
+
+    .shield-particle {
+      animation: none;
+      opacity: 0;
+    }
+  }
+</style>

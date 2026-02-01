@@ -1,0 +1,28 @@
+# Lychee link checker configuration.
+
+exclude = [
+  # GitHub raw content aggressively rate-limits unauthenticated requests;
+  # lychee hits 403/429 on cold caches.
+  "^https://github\\.com/.*/raw/",
+
+  # TODO: remove once tokenoverflow.io is live (tracked in
+  # docs/design/2026_04_20_landing_page.md).
+  "^https://tokenoverflow\\.io(/|$|#)",
+  "^https://www\\.tokenoverflow\\.io(/|$|#)",
+
+  # TODO: remove once the API is public-facing at this hostname.
+  "^https://api\\.tokenoverflow\\.io(/|$|#)",
+]
+
+# Allow private loopbacks to keep the test harness simple.
+exclude_loopback = false
+
+# Only real HTTP success/redirect codes count; 429 (rate-limited) is not a
+# real success and must fail the run per the "warnings should fail" policy.
+accept = [200, 204, 206, 301, 302, 307, 308]
+
+# Keep the run snappy.
+max_concurrency = 8
+timeout = 20
+retry_wait_time = 2
+max_retries = 2

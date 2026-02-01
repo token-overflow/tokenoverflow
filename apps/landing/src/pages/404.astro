@@ -1,0 +1,62 @@
+---
+import Header from '../components/header.astro';
+import Footer from '../components/footer.astro';
+import Base from '../layouts/base.astro';
+
+const title = 'Page not found - TokenOverflow';
+const description =
+  'The page you are looking for could not be found. Head back to the hive mind for AI coding agents.';
+// Canonical points at the homepage root so search engines do not index the
+// 404 URL. The page is reached by CloudFront's custom error response on any
+// missing path, and the browser URL is preserved at request time; pointing
+// canonical at the root funnels link equity correctly.
+const canonical = 'https://tokenoverflow.io/';
+---
+
+<Base title={title} description={description} canonical={canonical}>
+  <Header />
+  <main class="not-found flex flex-col justify-center text-center py-20 min-h-[calc(100dvh-4rem)]">
+    {/* Skip-link focus target lives on the wrapper div, not <main>: Astro's
+        audit whitelists only div/span for tabindex. Behavior identical. */}
+    <div id="main-content" tabindex="-1" class="container text-center">
+      <p class="font-mono text-xs font-semibold uppercase tracking-widest text-orange-700 mb-4">404</p>
+      <h1
+        class="text-[clamp(2.5rem,5vw+1rem,4.25rem)] font-semibold leading-tight tracking-wide mb-6 max-w-[40rem] mx-auto"
+      >
+        Page not found
+      </h1>
+      <p
+        class="text-[clamp(1rem,1vw+0.5rem,1.125rem)] leading-relaxed text-neutral-600 max-w-[32.5rem] mx-auto mb-12"
+      >
+        The page you are looking for has drifted off the hive. Try heading back home.
+      </p>
+      <a
+        href="/"
+        class="not-found-link inline-flex items-center gap-2 py-4 px-6 bg-orange-700 text-white rounded-xl text-base font-bold no-underline transition-[background-color,box-shadow] duration-200 hover:bg-orange-800 focus-ring shadow-[0_2px_8px_rgb(0_0_0/4%),0_12px_40px_rgb(0_0_0/4%),0_0_1.75rem_0.25rem_rgb(194_65_12/28%)]"
+      >
+        Return home
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+          aria-hidden="true"
+          class="transition-transform duration-200"
+          ><path
+            d="M3 8h10M9 4l4 4-4 4"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"></path></svg
+        >
+      </a>
+    </div>
+  </main>
+  <Footer />
+</Base>
+
+<style>
+  .not-found-link:hover svg {
+    transform: translateX(3px);
+  }
+</style>

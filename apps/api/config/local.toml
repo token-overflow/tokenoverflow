@@ -1,0 +1,36 @@
+# Local development with Docker mock services
+
+[api]
+host = "0.0.0.0"
+port = 8080
+base_url = "http://localhost:8080"
+request_timeout_secs = 30
+
+[auth]
+workos_client_id = "client_test"
+workos_api_url = "http://localhost:8080"
+jwks_url = "file://tests/assets/auth/test_jwks.json"
+jwks_cache_ttl_secs = 0
+issuer = "tokenoverflow-test"
+audiences = ["http://localhost:8080"]
+authkit_url = "https://intimate-figure-17.authkit.app"
+github_api_url = "https://api.github.com"
+github_client_id = "Ov23lifpB2PCzk8nmdni"
+
+[database]
+host = "localhost"
+port = 6432  # PgBouncer
+user = "tokenoverflow"
+password = "localdev"
+name = "tokenoverflow"
+
+[embedding]
+base_url = "http://localhost:3001/v1"
+model = "voyage-code-3"
+output_dimension = 256
+
+[mcp]
+base_url = "http://localhost:8080/mcp"
+
+[logging]
+level = "debug"

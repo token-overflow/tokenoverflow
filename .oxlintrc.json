@@ -1,0 +1,125 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "import", "node", "promise"],
+  "categories": {
+    "correctness": "deny",
+    "suspicious": "deny",
+    "pedantic": "warn",
+    "style": "warn",
+    "perf": "warn",
+    "restriction": "off",
+    "nursery": "off"
+  },
+  "rules": {
+    "no-console": "error",
+    "no-unused-vars": "error",
+    "typescript/no-explicit-any": "error",
+
+    "no-warning-comments": "off", // We keep intentional TODOs (e.g. vitest.config.ts oxc-coverage-instrument note).
+    "no-magic-numbers": [
+      "warn",
+      {
+        // Allow tiny/unit literals and font weights.
+        "ignore": [-1, 0, 1, 2, 400, 600, 700],
+        "ignoreArrayIndexes": true,
+        "ignoreDefaultValues": true,
+        "enforceConst": true,
+        "ignoreClassFieldInitialValues": true
+      }
+    ],
+    "capitalized-comments": [
+      "warn",
+      "always",
+      {
+        "ignoreConsecutiveComments": true,
+        "ignoreInlineComments": true
+      }
+    ],
+    "new-cap": [
+      "warn",
+      {
+        // Library factories (UnoCSS, WebsitePreview, etc.) use uppercase names without `new`.
+        "capIsNew": false
+      }
+    ],
+    "id-length": "off", // Single-char callback params (`(r)`, `(n)`, `({w, h})`) and for-loop counters (`i`) are textbook JS idioms; renaming them is pure churn.
+    "no-ternary": "off", // Simple binary selects (`isCI ? 1 : "100%"`) are idiomatic; `no-nested-ternary` catches the real smell.
+    "no-undefined": "off", // In TypeScript, `undefined` is a first-class value (optional params, `find()` return, `void 0`). The rule targets pre-strict-mode JS.
+    "sort-keys": "off", // Key order carries meaning (e.g. schema fields mirror DB columns). Formatter territory, not linter.
+    "sort-imports": "off", // oxfmt handles import ordering.
+
+    // Unicorn off-list.
+    "unicorn/filename-case": [
+      "error",
+      {
+        "case": "snakeCase",
+        "ignore": [
+          "^.+\\.astro$", // Astro components are PascalCase by convention.
+          "^.+\\.d\\.ts$" // Ambient declaration files follow the upstream module's name.
+        ]
+      }
+    ],
+    "unicorn/no-null": "off", // TypeScript distinguishes `null` (intentional empty) from `undefined` (absent); both are used meaningfully.
+    "unicorn/prevent-abbreviations": "off", // Notoriously noisy: `err`->`error`, `req`->`request`, `ctx`->`context` are established idioms.
+    "unicorn/no-array-for-each": "off", // `.forEach()` is readable; `for...of` is not always better.
+    "unicorn/prefer-query-selector": "off", // Rule is backwards: `getElementById` is faster and more specific than `querySelector('#id')`.
+    "unicorn/consistent-function-scoping": "off", // Hoisting helpers to outer scope often harms readability by separating usage from definition.
+    "unicorn/numeric-separators-style": [
+      "warn",
+      {
+        "number": { "minimumDigits": 4, "groupLength": 3 }
+      }
+    ],
+
+    // Import off-list.
+    "import/no-named-export": "off", // We use named exports everywhere outside config files.
+    "import/prefer-default-export": "off", // Single-export files don't need a default.
+    "import/no-default-export": "off", // astro.config.ts and similar require default exports.
+    "import/group-exports": "off", // Forcing all exports at the bottom loses "export at definition" clarity.
+    "import/no-named-as-default": "off", // False positives on libraries that publish default + named as the same symbol (@unocss/preset-*, @axe-core/playwright).
+    "import/consistent-type-specifier-style": "off", // Conflicts with `no-duplicate-imports` regardless of mode; type-only `import type { X }` is canonical and should not be rewritten.
+
+    // Node `no-unsupported-features/*` rules are stubs in oxlint 1.34 (config
+    // parses but rule never fires; verified empirically with an artificial
+    // Node 10 target). Node-version enforcement for the future `apps/web`
+    // BFF comes from two places: root `package.json` `engines.node` (docs
+    // + installer enforcement) and the BFF's tsconfig `lib` setting
+    // (`["ES2024"]` without DOM restricts the type surface to Node-safe
+    // APIs). Revisit this entry when oxlint ships the implementation.
+    "node/no-missing-import": "off" // False positives with bundler / workspace resolution (Astro aliases, TS path maps).
+  },
+  "ignorePatterns": [
+    "**/*.astro",
+    "**/dist/**",
+    "**/.astro/**",
+    "**/node_modules/**",
+    "**/coverage/**",
+    "**/playwright-report/**",
+    "**/test-results/**",
+    "**/.lighthouseci/**",
+    "**/.turbo/**"
+  ],
+  "overrides": [
+    {
+      "files": ["**/tests/**/*.ts", "**/*.test.ts", "**/*.spec.ts"],
+      "rules": {
+        "max-lines-per-function": "off", // Test `describe` / suite callbacks legitimately contain many cases; the rule is meant for production functions.
+        "no-await-in-loop": "off", // Playwright tests sequentialize clicks/navigations/assertions; parallelizing with `Promise.all` would change semantics.
+        "no-magic-numbers": "off", // Tests assert against specific status codes, dimensions, timeouts, and fixture sizes; naming each would be more noise than clarity.
+        "no-new-func": "off" // The CloudFront Function unit test loads the deployed JS source via `new Function(...)` so the same string Terraform ships gets executed; replacing it would mean a build step or a separate handler module, both of which add surface for no test value.
+      }
+    },
+    {
+      "files": ["**/cloudfront/*.js"],
+      "rules": {
+        "func-style": "off", // CloudFront Functions runtime invokes the global function literally named `handler`; an arrow expression assigned to a const cannot satisfy the entry-point contract.
+        "no-unused-vars": "off", // Same reason: `handler` is used by the runtime, not by any other source file.
+        "no-var": "off", // CloudFront Functions runtime documentation pins the example pattern to `var` bindings; we keep parity to remove a known foot-gun.
+        "vars-on-top": "off", // Paired with the above; the rule fires only because we keep `var` declarations.
+        "prefer-template": "off", // The runtime supports template literals on cloudfront-js-2.0, but the published source uses `+` concatenation to match every CloudFront Functions example AWS publishes.
+        "prefer-destructuring": "off", // Same reason: parity with the AWS-published example shape minimises surprise during incident response.
+        "capitalized-comments": "off" // Inline comments like `// www -> apex 301` are referencing literal hostnames, not English prose.
+      }
+    }
+  ]
+}

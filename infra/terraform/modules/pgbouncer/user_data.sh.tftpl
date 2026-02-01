@@ -1,0 +1,159 @@
+#!/bin/bash
+set -euo pipefail
+
+# =============================================================================
+# PgBouncer EC2 User Data
+#
+# This script runs on every instance launch (including ASG replacements).
+# It performs two tasks:
+#   1. Attach the dedicated ENI (AL2023 auto-configures policy routing)
+#   2. Install, configure, and start PgBouncer
+# =============================================================================
+
+exec > >(tee /var/log/user-data.log) 2>&1
+echo "=== PgBouncer user-data starting at $(date -u) ==="
+
+# ---------------------------------------------------------------------------
+# Variables from Terraform templatefile
+# ---------------------------------------------------------------------------
+ENI_ID="${eni_id}"
+RDS_ENDPOINT="${rds_endpoint}"
+DB_NAME="${database_name}"
+DB_USER="${database_user}"
+DB_PASSWORD="${database_password}"
+
+# ---------------------------------------------------------------------------
+# Step 1: Attach the dedicated ENI
+# ---------------------------------------------------------------------------
+echo "=== Step 1: Attaching ENI $ENI_ID ==="
+
+# Get instance ID and region from IMDS (IMDSv2)
+TOKEN=$(curl -sX PUT "http://169.254.169.254/latest/api/token" \
+  -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+INSTANCE_ID=$(curl -s "http://169.254.169.254/latest/meta-data/instance-id" \
+  -H "X-aws-ec2-metadata-token: $TOKEN")
+REGION=$(curl -s "http://169.254.169.254/latest/meta-data/placement/region" \
+  -H "X-aws-ec2-metadata-token: $TOKEN")
+
+echo "Instance: $INSTANCE_ID, Region: $REGION"
+
+# Force-detach if still attached to a previous instance (ASG replacement race)
+ATTACHMENT_ID=$(aws ec2 describe-network-interfaces \
+  --network-interface-ids "$ENI_ID" \
+  --region "$REGION" \
+  --query 'NetworkInterfaces[0].Attachment.AttachmentId' \
+  --output text 2>/dev/null || echo "None")
+
+if [ "$ATTACHMENT_ID" != "None" ] && [ -n "$ATTACHMENT_ID" ]; then
+  echo "ENI attached elsewhere ($ATTACHMENT_ID), force-detaching..."
+  aws ec2 detach-network-interface \
+    --attachment-id "$ATTACHMENT_ID" \
+    --force \
+    --region "$REGION" || true
+  for i in $(seq 1 30); do
+    STATUS=$(aws ec2 describe-network-interfaces \
+      --network-interface-ids "$ENI_ID" \
+      --region "$REGION" \
+      --query 'NetworkInterfaces[0].Status' \
+      --output text)
+    [ "$STATUS" = "available" ] && break
+    sleep 1
+  done
+fi
+
+aws ec2 attach-network-interface \
+  --network-interface-id "$ENI_ID" \
+  --instance-id "$INSTANCE_ID" \
+  --device-index 1 \
+  --region "$REGION"
+
+# AL2023's amazon-ec2-net-utils detects the new ENI via udev, assigns its IP,
+# and configures policy routing automatically via systemd-networkd. No manual
+# ip rule/route commands needed.
+echo "ENI attached. AL2023 will auto-configure IP and policy routing."
+
+# ---------------------------------------------------------------------------
+# Step 2: Install PgBouncer
+# ---------------------------------------------------------------------------
+echo "=== Step 2: Installing PgBouncer ==="
+
+# Install the PostgreSQL PGDG repository for AL2023 (aarch64).
+# AL2023 lacks /etc/redhat-release which the RPM declares as a dependency,
+# but the repo and packages are fully EL-9 compatible. Use --nodeps to skip.
+rpm -ivh --nodeps https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-aarch64/pgdg-redhat-repo-latest.noarch.rpm
+
+# AL2023 sets $releasever to its own version (e.g. 2023.10.xxx) instead of "9",
+# causing PGDG repo URLs to 404. Pin all pgdg repos to releasever=9.
+for repo in /etc/yum.repos.d/pgdg-redhat-all.repo; do
+  sed -i '/^\[pgdg/,/^$/{ /^$/i\module_hotfixes=1
+  }' "$repo"
+  sed -i 's|\$releasever|9|g' "$repo"
+done
+
+# Disable the default PostgreSQL module to avoid conflicts
+dnf -qy module disable postgresql 2>/dev/null || true
+
+# Install PgBouncer
+dnf install -y pgbouncer
+
+# ---------------------------------------------------------------------------
+# Step 3: Configure PgBouncer
+# ---------------------------------------------------------------------------
+echo "=== Step 3: Configuring PgBouncer ==="
+
+cat > /etc/pgbouncer/pgbouncer.ini << 'PGBOUNCER_EOF'
+[databases]
+PLACEHOLDER_DB = host=PLACEHOLDER_RDS port=5432 dbname=PLACEHOLDER_DBNAME
+
+[pgbouncer]
+listen_addr = 0.0.0.0
+listen_port = 6432
+auth_type = scram-sha-256
+auth_file = /etc/pgbouncer/userlist.txt
+pool_mode = transaction
+max_prepared_statements = 500
+default_pool_size = 5
+max_client_conn = 1000
+min_pool_size = 2
+server_connect_timeout = 15
+server_idle_timeout = 600
+query_wait_timeout = 120
+server_tls_sslmode = require
+log_connections = 1
+log_disconnections = 1
+log_pooler_errors = 1
+admin_users = pgbouncer
+ignore_startup_parameters = extra_float_digits
+PGBOUNCER_EOF
+
+sed -i "s|PLACEHOLDER_DBNAME|$DB_NAME|g" /etc/pgbouncer/pgbouncer.ini
+sed -i "s|PLACEHOLDER_RDS|$RDS_ENDPOINT|g" /etc/pgbouncer/pgbouncer.ini
+sed -i "s|PLACEHOLDER_DB|$DB_NAME|g" /etc/pgbouncer/pgbouncer.ini
+
+cat > /etc/pgbouncer/userlist.txt << USERLIST_EOF
+"$DB_USER" "$DB_PASSWORD"
+USERLIST_EOF
+
+chmod 600 /etc/pgbouncer/userlist.txt
+chown pgbouncer:pgbouncer /etc/pgbouncer/userlist.txt
+chown pgbouncer:pgbouncer /etc/pgbouncer/pgbouncer.ini
+
+# ---------------------------------------------------------------------------
+# Step 4: Start PgBouncer
+# ---------------------------------------------------------------------------
+echo "=== Step 4: Starting PgBouncer ==="
+
+systemctl enable pgbouncer
+systemctl start pgbouncer
+
+sleep 2
+if systemctl is-active --quiet pgbouncer; then
+  echo "PgBouncer is running successfully"
+  systemctl status pgbouncer --no-pager
+else
+  echo "ERROR: PgBouncer failed to start"
+  journalctl -u pgbouncer --no-pager -n 50
+  exit 1
+fi
+
+echo "=== PgBouncer user-data completed at $(date -u) ==="

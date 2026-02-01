@@ -1,0 +1,34 @@
+{
+  "//": "Prettier ships as a transitive dependency of @astrojs/language-server (via volar-service-prettier) for editor tooling only. It is NOT the project formatter. Do not format-on-save globally and do not invoke prettier directly; use oxfmt (TS/JS/JSON) and Stylelint (CSS/Astro). See README 'Dev Environment'.",
+  "editor.formatOnSave": false,
+  "editor.defaultFormatter": null,
+  "prettier.enable": false,
+  "[typescript]": {
+    "editor.defaultFormatter": null,
+    "editor.formatOnSave": false
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": null,
+    "editor.formatOnSave": false
+  },
+  "[json]": {
+    "editor.defaultFormatter": null,
+    "editor.formatOnSave": false
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": null,
+    "editor.formatOnSave": false
+  },
+  "[astro]": {
+    "editor.defaultFormatter": null,
+    "editor.formatOnSave": false
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": null,
+    "editor.formatOnSave": false
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": null,
+    "editor.formatOnSave": false
+  }
+}

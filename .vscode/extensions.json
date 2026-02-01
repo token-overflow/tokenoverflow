@@ -1,0 +1,15 @@
+{
+  "recommendations": [
+    "anthropic.claude-code",
+    "editorconfig.editorconfig",
+    "tamasfe.even-better-toml",
+    "hashicorp.terraform",
+    "rust-lang.rust-analyzer",
+    "antfu.unocss",
+    "oven.bun-vscode",
+    "astro-build.astro-vscode",
+    "hashicorp.hcl",
+    "oxc.oxc-vscode",
+    "bradlc.vscode-tailwindcss"
+  ]
+}

@@ -1,0 +1,51 @@
+# Static Web Server (SWS) config for the docker-compose `landing` service.
+#
+# Mirrors the CloudFront edge behavior we rely on in production so local e2e
+# tests exercise the same URL shape:
+#   - Extensionless paths resolve to <slug>/index.html (Astro build.format =
+#     'directory' emits them that way; SWS serves a directory's index.html
+#     automatically via redirect-trailing-slash).
+#   - HTML responses revalidate every pageview.
+#   - Hashed /_astro/** assets get a year-long immutable cache.
+#   - Missing paths return the branded 404.html with a real HTTP 404 status
+#     (mirrors the CloudFront custom-error response in prod).
+#
+# Port 4321 matches Astro's preview default so Playwright and Lighthouse CI
+# hit the same URL as `TOKENOVERFLOW_ENV=local` resolves via
+# @tokenoverflow/config (base_url = http://localhost:4321).
+[general]
+host = "0.0.0.0"
+port = 4321
+root = "/public"
+log-level = "warn"
+
+# Astro's build.format = 'directory' produces <slug>/index.html; SWS's default
+# redirect-trailing-slash lands the extensionless path on the right file.
+redirect-trailing-slash = true
+
+# Disable the built-in Cache-Control defaults (one-day / one-year buckets by
+# file extension) so the per-path overrides below are authoritative.
+cache-control-headers = false
+
+# Gzip + brotli auto-negotiation on text payloads.
+compression = true
+
+directory-listing = false
+
+# Branded 404 served with HTTP 404 status. page-fallback would return 200
+# (SPA use case) so we use page404, which matches the CloudFront custom-error
+# response (origin 4xx -> /404.html with status 404).
+page404 = "/public/404.html"
+
+[advanced]
+
+# Hashed Astro assets under /_astro/** are content-addressed, so cache them
+# for a year and mark immutable to skip revalidation.
+[[advanced.headers]]
+source = "/_astro/**"
+headers = { Cache-Control = "public, max-age=31536000, immutable" }
+
+# HTML revalidates every pageview to pick up copy/layout fixes instantly.
+[[advanced.headers]]
+source = "**/*.html"
+headers = { Cache-Control = "public, max-age=0, must-revalidate" }

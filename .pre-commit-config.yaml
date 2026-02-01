@@ -1,0 +1,195 @@
+exclude: ^.idea
+default_language_version:
+  python: python3.14
+  ruby: 2.7.6
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # v6.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-json
+        exclude: \.oxlintrc\.json$  # JSONC: oxlint config supports inline comments.
+      - id: check-shebang-scripts-are-executable
+        exclude: (\.rs$|\.tftpl$)  # Rust inner attributes, Terraform templates
+      - id: pretty-format-json
+        args:
+          - --autofix
+          - --no-sort-keys
+        exclude: (package\.json|package-lock\.json|pnpm-lock\.yaml|tsconfig\.json|turbo\.json|\.oxlintrc\.json)
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-toml
+      - id: check-vcs-permalinks
+      - id: check-xml
+      - id: check-yaml
+      - id: destroyed-symlinks
+      - id: detect-private-key
+        exclude: tests/assets/auth/test_private_key\.pem$
+      - id: end-of-file-fixer
+      - id: fix-byte-order-marker
+      - id: forbid-submodules
+      - id: mixed-line-ending
+      - id: no-commit-to-branch
+      - id: trailing-whitespace
+        exclude_types: [ markdown ]
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: 192ad822316c3a22fb3d3cc8aa6eafa0b8488360  # v0.45.0
+    hooks:
+      - id: markdownlint
+        exclude: (^\.github/|^\.opencode/|^\.agents/)
+  - repo: https://github.com/jumanjihouse/pre-commit-hooks
+    rev: 38980559e3a605691d6579f96222c30778e5a69e  # 3.0.0
+    hooks:
+      - id: forbid-binary
+        exclude: ^(apps/landing/public/(favicon|apple-touch-icon|icon-|og/))
+      - id: script-must-have-extension
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: ad1b27d73581aa16cca06fc4a0761fc563ffe8e8  # v1.5.6
+    hooks:
+      - id: chmod
+        args: [ '755' ]
+        files: \.sh$
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: 745eface02aef23e168a8afb6b5737818efbea95  # v0.11.0.1
+    hooks:
+      - id: shellcheck
+        args: [ '-x' ]
+        exclude: \.tftpl$  # Terraform templates use ${var} interpolation
+  - repo: https://github.com/bnjbvr/cargo-machete
+    rev: 7959c845782fed02ee69303126d4a12d64f1db18  # v0.9.1
+    hooks:
+      - id: cargo-machete
+  - repo: local
+    hooks:
+      # BASH
+      - id: bashunit
+        name: Bash Unit Tests
+        entry: find scripts/tests -type f -name test_*.sh -exec bashunit {} +
+        language: system
+        files: \.sh$
+        pass_filenames: false
+
+      # TERRAFORM
+      - id: tflint
+        name: TFLint
+        entry: scripts/src/git_hooks/tflint.sh
+        language: script
+        types_or: [terraform, hcl]
+        pass_filenames: false
+        stages:
+          - pre-commit
+
+      # SECURITY
+      - id: trivy
+        name: Trivy Scan
+        entry: scripts/src/git_hooks/trivy.sh
+        language: script
+        pass_filenames: false
+        stages:
+          - pre-commit
+
+      # RUST
+      - id: cargo-fmt
+        name: Cargo Format
+        entry: cargo +nightly fmt --all -- --check
+        language: system
+        types: [ rust ]
+        pass_filenames: false
+      - id: cargo-clippy
+        name: Cargo Clippy
+        entry: cargo clippy --workspace --tests -- -D warnings
+        language: system
+        types: [ rust ]
+        pass_filenames: false
+      - id: cargo-audit
+        name: Cargo Audit
+        entry: cargo audit
+        language: system
+        types: [ rust ]
+        pass_filenames: false
+      - id: cargo-coverage
+        name: Cargo Coverage
+        entry: scripts/src/git_hooks/cargo_coverage.sh
+        language: script
+        types: [ rust ]
+        pass_filenames: false
+
+      # GITHUB ACTION
+      - id: act-terraform
+        name: act (Terraform)
+        entry: act push -W .github/workflows/terraform.yml -e .github/act/event_push_main.json --secret-file .act.secrets
+        language: system
+        files: ^\.github/workflows/terraform\.yml$
+        pass_filenames: false
+      - id: act-deploy
+        name: act (Deploy API)
+        entry: act push -W .github/workflows/deploy_api.yml -e .github/act/event_push_main.json --secret-file .act.secrets
+        language: system
+        files: ^\.github/workflows/deploy_api\.yml$
+        pass_filenames: false
+      - id: act-landing
+        name: act (Deploy Landing)
+        entry: act push -W .github/workflows/deploy_landing.yml -e .github/act/event_push_main.json --secret-file .act.secrets
+        language: system
+        files: ^(\.github/workflows/deploy_landing\.yml|apps/landing/.*|packages/.*|bun\.lock)$
+        pass_filenames: false
+
+      # LINKS
+      - id: lychee
+        name: Lychee
+        entry: lychee --config .lychee.toml --no-progress
+        language: system
+        files: \.(md|astro|mdx)$
+        exclude: ^(node_modules|apps/landing/dist|.*/dist)/
+
+      # LANDING
+      - id: forbid-is-inline
+        name: Forbid is:inline
+        entry: scripts/src/git_hooks/forbid_is_inline.sh
+        language: script
+        files: ^apps/landing/.*\.astro$
+      - id: forbid-raw-raster-img
+        name: Forbid Raw Raster <img> in src/
+        entry: scripts/src/git_hooks/forbid_raw_raster_img.sh
+        language: script
+        files: ^apps/landing/src/.*\.astro$
+        pass_filenames: false
+
+      # TURBOREPO
+      - id: turbo-check
+        name: Turbo Check
+        entry: bash -c 'TURBO_SCM_BASE=HEAD bun run turbo run check --affected'
+        language: system
+        pass_filenames: false
+      - id: turbo-lint
+        name: Turbo Lint
+        entry: bash -c 'TURBO_SCM_BASE=HEAD bun run turbo run lint --affected'
+        language: system
+        pass_filenames: false
+      - id: turbo-format-check
+        name: Turbo Format Check
+        entry: bash -c 'TURBO_SCM_BASE=HEAD bun run turbo run format:check --affected'
+        language: system
+        pass_filenames: false
+      - id: turbo-lint-css
+        name: Turbo Lint CSS
+        entry: bash -c 'TURBO_SCM_BASE=HEAD bun run turbo run lint:css --affected'
+        language: system
+        pass_filenames: false
+      - id: turbo-test-coverage
+        name: Turbo Test Coverage
+        entry: bash -c 'TURBO_SCM_BASE=HEAD bun run turbo run test:coverage --affected'
+        language: system
+        pass_filenames: false
+      - id: turbo-test-e2e
+        name: Turbo Test E2E
+        entry: bash -c 'TURBO_SCM_BASE=HEAD bun run turbo run test:e2e --affected'
+        language: system
+        pass_filenames: false
+      - id: turbo-test-lhci
+        name: Turbo Test LHCI
+        entry: bash -c 'TURBO_SCM_BASE=HEAD bun run turbo run test:lhci --affected'
+        language: system
+        pass_filenames: false

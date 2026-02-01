@@ -1,0 +1,11 @@
+[install]
+# Isolated linker keeps workspace boundaries honest; no package can import a
+# transitive dep it did not declare itself.
+linker = "isolated"
+# `exact = true` makes `bun add <pkg>` pin the installed version literally
+# (no leading ^ or ~). Semver ranges drift silently; explicit versions land
+# in a commit you can review.
+exact = true
+# `frozenLockfile = true` makes every default `bun install` refuse to edit
+# bun.lock. Intentional lockfile updates must pass `--no-frozen-lockfile`.
+frozenLockfile = true

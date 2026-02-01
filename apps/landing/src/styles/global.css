@@ -1,0 +1,151 @@
+/*
+ * Landing page global styles.
+ *
+ * Utility-first is the mandate. This file only carries rules that cannot
+ * reduce to a single utility at the call site:
+ *
+ * Every brand value reaches CSS via theme() (rewritten at build time by
+ * @unocss/transformer-directives). Raw hex literals are forbidden outside
+ * data-URL payloads.
+ */
+
+:root {
+  color-scheme: light;
+}
+
+::selection {
+  background: theme("colors.orange.500");
+  color: theme("colors.white");
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: theme("colors.neutral.50");
+  color: theme("colors.neutral.900");
+  line-height: 1.625;
+
+  /* Prevents horizontal scroll from decorative elements (canvas, hex-grid) that extend beyond viewport. */
+  overflow-x: hidden;
+}
+
+#hex-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72.75' height='126'%3E%3Cpath d='M36.37 0L72.75 21V63L36.37 84L0 63V21ZM36.37 84V126' fill='none' stroke='black' stroke-opacity='0.07' stroke-width='1'/%3E%3C/svg%3E");
+  background-size: 72.75px 126px;
+  background-position: center 4rem;
+
+  --mask-y: 22rem;
+
+  mask-image: radial-gradient(
+    ellipse 120% 75% at 50% var(--mask-y),
+    transparent 0%,
+    transparent 25%,
+    black 60%
+  );
+  opacity: 0.5;
+}
+
+/* ASCII canvas shares the mask-y variable driven by ascii.astro, inverted so
+   the ascii layer shows inside the hex grid's transparent window. */
+#ascii-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+
+  --mask-y: 22rem;
+
+  mask-image: radial-gradient(
+    ellipse 120% 75% at 50% var(--mask-y),
+    black 0%,
+    black 20%,
+    transparent 60%
+  );
+}
+
+/* Skip link: hidden off-screen until focused; expresses a transform-based
+   reveal that would otherwise need a stateful variant chain on every page. */
+.skip-link {
+  position: absolute;
+  inset-block-start: 0.5rem;
+  inset-inline-start: 0.5rem;
+  z-index: 200;
+  padding: 0.75rem 1.25rem;
+  background: theme("colors.white");
+  color: theme("colors.neutral.900");
+  border: 2px solid theme("colors.orange.500");
+  border-radius: theme("radius.lg");
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-150%);
+  transition: transform 0.15s ease;
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  transform: translateY(0);
+  outline: 2px solid theme("colors.orange.500");
+  outline-offset: 2px;
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid theme("colors.orange.500");
+  outline-offset: 2px;
+  border-radius: theme("radius.lg");
+}
+
+[data-fade-in] {
+  opacity: 0;
+  transform: translateY(1rem);
+  transition-property: opacity, transform;
+  transition-duration: 0.5s;
+  transition-timing-function: ease;
+}
+
+[data-fade-in].is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-fade-in],
+  [data-fade-in].is-visible {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+.container {
+  max-width: theme("container.7xl");
+  margin-inline: auto;
+  padding-inline: 2rem;
+  position: relative;
+  z-index: 2;
+}
+
+.section {
+  padding-block: 3rem;
+  position: relative;
+  scroll-margin-top: 4rem;
+  z-index: 2;
+}
+
+@media (width <= 48rem) {
+  .section {
+    padding-block: 5rem;
+  }
+}
