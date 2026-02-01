@@ -1,0 +1,20 @@
+info:
+  name: downvote-answer
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{base_url}}/v1/answers/{{answer_id}}/downvote"
+  auth: inherit
+
+runtime:
+  variables:
+    - name: answer_id
+      value: 019d28d0-a543-7a51-8fb5-f52807fcc1b7
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

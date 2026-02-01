@@ -1,0 +1,29 @@
+info:
+  name: search
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/v1/search"
+  body:
+    type: json
+    data: |-
+      {
+        "query": "{{query}}",
+        "limit": {{limit}}
+      }
+  auth: inherit
+
+runtime:
+  variables:
+    - name: query
+      value: How do I handle errors in Rust?
+    - name: limit
+      value: "5"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

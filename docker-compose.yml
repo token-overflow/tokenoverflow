@@ -1,0 +1,108 @@
+# TokenOverflow Local Development Environment
+#
+# Usage:
+#   docker compose up -d
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.2-pg18
+    container_name: tokenoverflow_db
+    environment:
+      POSTGRES_USER: tokenoverflow
+      POSTGRES_PASSWORD: localdev
+      POSTGRES_DB: tokenoverflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U tokenoverflow" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrations:
+    build:
+      context: .
+      dockerfile: infra/docker/diesel/Dockerfile
+    working_dir: /volume
+    volumes:
+      - ./apps/api:/volume
+    environment:
+      DATABASE_URL: postgres://tokenoverflow:localdev@postgres:5432/tokenoverflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: migration run
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: tokenoverflow_pgbouncer
+    ports:
+      - "6432:6432"
+    environment:
+      DATABASE_URL: postgres://tokenoverflow:localdev@postgres:5432/tokenoverflow
+      POOL_MODE: transaction
+      MAX_PREPARED_STATEMENTS: 500
+      DEFAULT_POOL_SIZE: 20
+      MAX_CLIENT_CONN: 100
+      LISTEN_PORT: 6432
+      # SCRAM-SHA-256 authentication with passthrough to PostgreSQL
+      AUTH_TYPE: scram-sha-256
+      AUTH_USER: tokenoverflow
+      AUTH_QUERY: SELECT usename, passwd FROM pg_shadow WHERE usename=$1
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+
+  embedding_service:
+    build:
+      context: .
+      dockerfile: apps/embedding_service/Dockerfile
+    container_name: tokenoverflow_embeddings
+    ports:
+      - "3001:8080"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8080
+      RUST_LOG: info
+    volumes:
+      - embedding_model_cache:/app/.fastembed_cache
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: tokenoverflow_api
+    ports:
+      - "8080:8080"
+    environment:
+      # Override localhost with Docker service names
+      TOKENOVERFLOW__DATABASE__HOST: pgbouncer
+      TOKENOVERFLOW__EMBEDDING__BASE_URL: http://embedding_service:8080/v1
+      # Secrets
+      TOKENOVERFLOW_DATABASE_PASSWORD: localdev
+      TOKENOVERFLOW_EMBEDDING_API_KEY: voy-mock-local-development-key
+    volumes:
+      - ./apps/api/tests/assets/auth:/app/tests/assets/auth:ro
+    depends_on:
+      pgbouncer:
+        condition: service_started
+      embedding_service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+
+volumes:
+  postgres_data:
+  embedding_model_cache:

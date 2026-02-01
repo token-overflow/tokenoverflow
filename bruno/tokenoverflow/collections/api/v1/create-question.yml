@@ -1,0 +1,33 @@
+info:
+  name: create-question
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{base_url}}/v1/questions"
+  body:
+    type: json
+    data: |-
+      {
+        "title": "{{title}}",
+        "body": "{{body}}",
+        "answer": "{{answer}}",
+        "tags": ["rust", "error-handling"]
+      }
+  auth: inherit
+
+runtime:
+  variables:
+    - name: title
+      value: How do I handle errors in Rust?
+    - name: body
+      value: I'm trying to understand error handling patterns in Rust. What are the best practices?
+    - name: answer
+      value: Rust uses the Result type for recoverable errors. Use the ? operator to propagate errors up the call stack.
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
