@@ -1,0 +1,22 @@
+{
+  "extends": "@tokenoverflow/tsconfig/astro",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["astro/client", "bun"]
+  },
+  "include": [
+    "src/**/*",
+    "scripts/**/*.ts",
+    "tests/common/**/*",
+    "tests/e2e/**/*",
+    "tests/integration/**/*",
+    "tests/unit/**/*",
+    "astro.config.ts",
+    "uno.config.ts",
+    "playwright.config.ts",
+    "vitest.config.ts"
+  ],
+  "exclude": [
+    "dist/**/*"
+  ]
+}

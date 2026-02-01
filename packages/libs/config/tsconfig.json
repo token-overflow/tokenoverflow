@@ -1,0 +1,9 @@
+{
+  "extends": "@tokenoverflow/tsconfig/base",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "types": ["bun"]
+  },
+  "include": ["src/**/*.ts"]
+}

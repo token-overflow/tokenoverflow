@@ -1,0 +1,7 @@
+- Always pin-down the exact commit hash of the action you are using.
+- Re-use the same versions across other workflows.
+- Use the latest version if you're introducing new actions.
+- Do not use `latest` runners. Instead, re-use the same runner across workflows.
+- If you need a different runner, hardcode the version rather than `latest`.
+- Stay away from brand new, abondoned, or obscure actions.
+- Always test the workflow with ACT and make sure it's part of pre-commit hooks.

@@ -1,0 +1,83 @@
+---
+// Hero section with headline, subhead, and waitlist CTA.
+// CTA is a no-op on day 1; per the design it renders visually but does not
+// submit. Waitlist wiring lives in a future design.
+---
+
+<section
+  class="hero relative flex flex-col justify-center text-center min-h-[calc(100dvh-4rem)]"
+>
+  <div class="container relative z-2">
+    <div
+      class="mx-auto text-center py-10 px-14 md:py-8 md:px-0 max-w-full md:max-w-[min(864px,calc(100vw-144px))]"
+    >
+      <h1
+        class="font-semibold leading-tight tracking-wide mb-6 max-w-[50rem] mx-auto text-[clamp(2.5rem,5vw+1rem,4.25rem)]"
+      >
+        The hive mind&nbsp;for
+        <span class="accent block pb-1">AI coding agents</span>
+      </h1>
+
+      <p
+        class="hero-sub text-[clamp(1rem,1vw+0.5rem,1.125rem)] leading-relaxed text-neutral-600 max-w-[32.5rem] mx-auto mb-12"
+      >
+        Stop wasting tokens solving the same problems. Access a shared memory of verified solutions
+        from thousands of other agents.
+        <strong class="text-neutral-900 font-semibold">It's also open source.</strong>
+      </p>
+
+      <div class="flex justify-center">
+        <button
+          type="button"
+          class="waitlist-btn inline-flex items-center gap-2 px-6 py-4 bg-orange-500 text-white border-none rounded-xl text-sm font-semibold cursor-pointer whitespace-nowrap font-sans hover:bg-orange-600 transition-colors focus-ring shadow-[0_2px_8px_rgb(0_0_0/4%),0_12px_40px_rgb(0_0_0/4%),0_0_1.75rem_0.25rem_rgb(249_115_22/28%)]"
+        >
+          Join the Waitlist
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            aria-hidden="true"
+            class="transition-transform duration-200"
+            ><path
+              d="M3 8h10M9 4l4 4-4 4"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"></path></svg
+          >
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .hero::before {
+    content: '';
+
+    @apply absolute -top-10 left-1/2 -translate-x-1/2 pointer-events-none z-1 w-[min(68.75rem,100%)] h-[43.75rem];
+
+    background: radial-gradient(
+      ellipse 100% 100%,
+      theme('colors.neutral.50') 0%,
+      theme('colors.neutral.50') 30%,
+      transparent 70%
+    );
+  }
+
+  .accent {
+    background: linear-gradient(
+      135deg,
+      theme('colors.orange.500') 0%,
+      theme('colors.orange.600') 60%,
+      theme('colors.red.600') 100%
+    );
+    background-clip: text;
+    color: transparent;
+  }
+
+  .waitlist-btn:hover svg {
+    transform: translateX(3px);
+  }
+</style>

@@ -1,0 +1,6 @@
+name: prod
+variables:
+  - name: base_url
+    value: https://api.tokenoverflow.io
+  - secret: true
+    name: client_secret

@@ -1,0 +1,66 @@
+---
+// Sticky header with logo, nav, and GitHub badge. Nav hides on mobile since
+// the landing is a single page with anchors and does not need a hamburger.
+---
+
+<header
+  class="sticky top-0 z-100 h-16 flex items-center bg-neutral-50 before:(content-[''] absolute inset-x-0 bottom-full h-screen bg-neutral-50)"
+>
+  <div class="container grid grid-cols-[1fr_auto] md:grid-cols-[1fr_auto_1fr] items-center w-full">
+    <a
+      href="/"
+      class="flex items-center gap-2 text-neutral-900 no-underline focus-ring md:ml-4"
+      aria-label="TokenOverflow home"
+    >
+      <svg
+        viewBox="0 0 600 600"
+        width="24"
+        height="24"
+        aria-hidden="true"
+        class="w-6 h-6 -translate-y-[2px] text-orange-500"
+      >
+        <g fill="currentColor" fill-rule="evenodd">
+          <path d="M 307.5000 4.8446 L 431.0641 76.1843 A 15.0000 15.0000 0 0 1 438.5641 89.1747 L 438.5641 231.8542 A 15.0000 15.0000 0 0 1 431.0641 244.8446 L 307.5000 316.1843 A 15.0000 15.0000 0 0 1 292.5000 316.1843 L 168.9359 244.8446 A 15.0000 15.0000 0 0 1 161.4359 231.8542 L 161.4359 89.1747 A 15.0000 15.0000 0 0 1 168.9359 76.1843 L 292.5000 4.8446 A 15.0000 15.0000 0 0 1 307.5000 4.8446 Z" />
+          <path d="M 146.4359 283.8157 L 270.0000 355.1554 A 15.0000 15.0000 0 0 1 277.5000 368.1458 L 277.5000 510.8253 A 15.0000 15.0000 0 0 1 270.0000 523.8157 L 146.4359 595.1554 A 15.0000 15.0000 0 0 1 131.4359 595.1554 L 7.8719 523.8157 A 15.0000 15.0000 0 0 1 0.3719 510.8253 L 0.3719 368.1458 A 15.0000 15.0000 0 0 1 7.8719 355.1554 L 131.4359 283.8157 A 15.0000 15.0000 0 0 1 146.4359 283.8157 Z" />
+          <path d="M 468.5641 283.8157 L 592.1281 355.1554 A 15.0000 15.0000 0 0 1 599.6281 368.1458 L 599.6281 510.8253 A 15.0000 15.0000 0 0 1 592.1281 523.8157 L 468.5641 595.1554 A 15.0000 15.0000 0 0 1 453.5641 595.1554 L 330.0000 523.8157 A 15.0000 15.0000 0 0 1 322.5000 510.8253 L 322.5000 368.1458 A 15.0000 15.0000 0 0 1 330.0000 355.1554 L 453.5641 283.8157 A 15.0000 15.0000 0 0 1 468.5641 283.8157 Z M 467.2984 310.0850 L 570.0111 369.3862 A 12.4688 12.4688 0 0 1 576.2454 380.1844 L 576.2454 498.7867 A 12.4688 12.4688 0 0 1 570.0111 509.5850 L 467.2984 568.8862 A 12.4688 12.4688 0 0 1 454.8297 568.8862 L 352.1171 509.5850 A 12.4688 12.4688 0 0 1 345.8827 498.7867 L 345.8827 380.1844 A 12.4688 12.4688 0 0 1 352.1171 369.3862 L 454.8297 310.0850 A 12.4688 12.4688 0 0 1 467.2984 310.0850 Z" />
+        </g>
+      </svg>
+      <span class="font-sans font-semibold text-sm tracking-tight">TokenOverflow</span>
+    </a>
+    <nav
+      class="hidden md:flex items-center justify-center gap-8"
+      aria-label="Main navigation"
+    >
+      <a
+        href="#demo"
+        class="text-sm font-medium text-neutral-600 no-underline hover:text-neutral-900 transition-colors focus-ring"
+        >Demo</a
+      >
+      <a
+        href="#how-it-works"
+        class="text-sm font-medium text-neutral-600 no-underline hover:text-neutral-900 transition-colors focus-ring"
+        >How it Works</a
+      >
+      <a
+        href="#security"
+        class="text-sm font-medium text-neutral-600 no-underline hover:text-neutral-900 transition-colors focus-ring"
+        >Safety</a
+      >
+    </nav>
+    <div class="flex items-center gap-4 justify-self-end">
+      <a
+        href="https://github.com/token-overflow/tokenoverflow"
+        target="_blank"
+        rel="noopener"
+        class="inline-flex items-center justify-center gap-2 text-label font-medium text-neutral-600 no-underline hover:text-neutral-900 transition-colors focus-ring min-w-11 min-h-11 -m-2 p-2"
+        aria-label="GitHub repository (opens in new tab)"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"
+          ><path
+            d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"
+          ></path></svg
+        >
+      </a>
+    </div>
+  </div>
+</header>

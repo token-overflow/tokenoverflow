@@ -1,0 +1,64 @@
+---
+export interface Props {
+  title: string;
+  description: string;
+  canonical: string;
+  ogImage?: string;
+  jsonLd?: Record<string, unknown>;
+}
+
+const {
+  title,
+  description,
+  canonical,
+  ogImage = 'https://tokenoverflow.io/og/og.png',
+  jsonLd,
+} = Astro.props;
+---
+
+<title>{title}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonical} />
+<meta
+  name="robots"
+  content="index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1"
+/>
+
+<meta property="og:type" content="website" />
+<meta property="og:url" content={canonical} />
+<meta property="og:site_name" content="TokenOverflow" />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:image" content={ogImage} />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:locale" content="en_US" />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={ogImage} />
+
+{
+  /* Trusted Types does not apply to JSON-LD script nodes. The payload is
+     built at build time from a typed object, never from user input, so
+     set:html is safe here. */
+}
+{
+  /*
+   * JSON-LD payload is built from a typed object at build time, never from
+   * user input. CSP is satisfied because Trusted Types does not apply to
+   * `application/ld+json` nodes, and the node is data, not executable code.
+   *
+   * `set:html` triggers an Astro processing hint for non-module <script>
+   * tags; we silence it by rendering the serialised JSON into a Fragment
+   * wrapper, keeping the node out of Astro's script-processing pipeline.
+   */
+}
+{
+  jsonLd && (
+    <Fragment
+      set:html={`<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>`}
+    />
+  )
+}

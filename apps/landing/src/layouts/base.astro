@@ -1,0 +1,86 @@
+---
+import Seo from '../components/seo.astro';
+import '../styles/global.css';
+
+export interface Props {
+  title: string;
+  description: string;
+  canonical: string;
+  ogImage?: string;
+  jsonLd?: Record<string, unknown>;
+}
+
+const { title, description, canonical, ogImage, jsonLd } = Astro.props;
+const seoProps: {
+  title: string;
+  description: string;
+  canonical: string;
+  ogImage?: string;
+  jsonLd?: Record<string, unknown>;
+} = { title, description, canonical };
+if (ogImage !== undefined) seoProps.ogImage = ogImage;
+if (jsonLd !== undefined) seoProps.jsonLd = jsonLd;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f97316" />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <Seo {...seoProps} />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+
+    <div id="hex-grid" aria-hidden="true"></div>
+
+    <slot />
+
+    {/* Fade-in observer: adds .is-visible to any [data-fade-in] when it crosses 10%. */}
+    <script>
+      const elements = document.querySelectorAll<HTMLElement>('[data-fade-in]');
+      if (elements.length > 0) {
+        const observer = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (entry.isIntersecting) {
+                entry.target.classList.add('is-visible');
+                observer.unobserve(entry.target);
+              }
+            }
+          },
+          { threshold: 0.1, rootMargin: '0px 0px -30px 0px' }
+        );
+        for (const element of elements) observer.observe(element);
+      }
+    </script>
+
+    {/* Smooth-scroll delegate. Guards bare # hrefs; honors prefers-reduced-motion. */}
+    <script>
+      const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+      document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        const anchor = target.closest('a[href^="#"]');
+        if (!(anchor instanceof HTMLAnchorElement)) return;
+        const href = anchor.getAttribute('href');
+        if (!href || href === '#') return;
+        const node = document.querySelector(href);
+        if (!node) return;
+        event.preventDefault();
+        node.scrollIntoView({
+          behavior: prefersReduced.matches ? 'auto' : 'smooth',
+          block: 'start',
+        });
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,98 @@
+name: Deploy API
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "apps/api/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "!**/*.md"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-24.04-arm
+    environment: prod
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Configure AWS credentials
+        if: ${{ !github.event.act }}
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7  # v6.0.0
+        with:
+          role-to-assume: ${{ secrets.AWS_IAM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9  # stable
+        with:
+          toolchain: stable
+
+      - name: Install cargo-lambda
+        run: pip3 install --break-system-packages cargo-lambda
+
+      - name: Install Session Manager plugin
+        if: ${{ !github.event.act }}
+        uses: ankurk91/install-session-manager-plugin-action@bf762f2baff16807788bb3e3199da1a77f0b6666  # v1
+
+      - name: Build Lambda artifact
+        run: cargo lambda build -p tokenoverflow --release --arm64 --features bundled-libs
+
+      - name: Establish SSM tunnel
+        if: ${{ !github.event.act }}
+        env:
+          TOKENOVERFLOW_RDS_TUNNEL_HOST: "main.ccp4e4gum1b0.us-east-1.rds.amazonaws.com"
+          TOKENOVERFLOW_RDS_TUNNEL_PORT: "5432"
+        run: |
+          scripts/src/rds_tunnel.sh &
+
+          for i in {1..30}; do
+            nc -z localhost 5432 2>/dev/null && exit 0
+            sleep 1
+          done
+
+          echo "Tunnel failed to establish"
+          exit 1
+
+      - name: Run database migrations
+        if: ${{ !github.event.act }}
+        env:
+          TOKENOVERFLOW_ENV: production
+          TOKENOVERFLOW_CONFIG_DIR: apps/api/config
+          TOKENOVERFLOW__DATABASE__HOST: localhost
+          TOKENOVERFLOW__DATABASE__PORT: "5432"
+        run: |
+          TOKENOVERFLOW_DATABASE_PASSWORD=$(aws ssm get-parameter \
+            --name /tokenoverflow/prod/database-password \
+            --with-decryption \
+            --query Parameter.Value \
+            --output text)
+          export TOKENOVERFLOW_DATABASE_PASSWORD
+
+          ./target/lambda/tokenoverflow/bootstrap --migrate
+
+      - name: Deploy Lambda function
+        if: ${{ !github.event.act }}
+        run: |
+          SHA=$(shasum -a 256 target/lambda/tokenoverflow/bootstrap | cut -c1-12)
+
+          cargo lambda deploy api \
+            --binary-name tokenoverflow \
+            --include config:apps/api/config \
+            --s3-bucket tokenoverflow-lambda-prod \
+            --s3-key "api/${SHA}.zip" \
+            --region "$AWS_REGION"

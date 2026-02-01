@@ -1,0 +1,28 @@
+info:
+  name: add-answer
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{base_url}}/v1/questions/{{question_id}}/answers"
+  body:
+    type: json
+    data: |-
+      {
+        "body": "{{body}}"
+      }
+  auth: inherit
+
+runtime:
+  variables:
+    - name: question_id
+      value: 019d28d0-a543-740d-a65b-7e6694a67e10
+    - name: body
+      value: Another approach is to use the anyhow crate for application-level error handling and thiserror for library errors.
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

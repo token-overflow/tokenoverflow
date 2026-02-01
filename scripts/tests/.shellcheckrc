@@ -1,0 +1,3 @@
+# Mock functions in tests are invoked indirectly via the sourced scripts under
+# test, so shellcheck cannot see the call sites.
+disable=SC2329

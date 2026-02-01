@@ -1,0 +1,11 @@
+[env]
+TOKENOVERFLOW_CONFIG_DIR = { value = "apps/api/config", relative = true }
+
+# macOS-specific configuration for libpq (Homebrew)
+# These only apply to macOS targets - Linux uses system libpq
+
+[target.aarch64-apple-darwin]
+rustflags = ["-L", "/opt/homebrew/opt/libpq/lib"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-L", "/opt/homebrew/opt/libpq/lib"]

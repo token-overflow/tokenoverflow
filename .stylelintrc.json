@@ -1,0 +1,32 @@
+{
+  "extends": [
+    "stylelint-config-standard"
+  ],
+  "languageOptions": {
+    "syntax": {
+      "types": {
+        "color": "| theme( <string> )",
+        "length": "| theme( <string> )",
+        "length-percentage": "| theme( <string> )"
+      }
+    }
+  },
+  "rules": {
+    "selector-pseudo-class-no-unknown": [
+      true,
+      {
+        "ignorePseudoClasses": [
+          "global"
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "**/*.astro"
+      ],
+      "customSyntax": "postcss-html"
+    }
+  ]
+}

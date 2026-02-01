@@ -1,0 +1,38 @@
+{
+  "name": "tokenoverflow",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/configs/*",
+    "packages/libs/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "build:landing": "turbo run build --filter=@tokenoverflow/landing",
+    "dev": "turbo run dev",
+    "check": "turbo run check",
+    "preview": "turbo run preview",
+    "deploy": "turbo run deploy",
+    "test": "turbo run test",
+    "test:coverage": "turbo run test:coverage",
+    "test:e2e": "turbo run test:e2e",
+    "test:lhci": "turbo run test:lhci",
+    "lint": "turbo run lint lint:css",
+    "format:check": "turbo run format:check",
+    "format": "oxfmt --write --ignore-path .gitignore '**/*.{ts,tsx,js,mjs,cjs}'"
+  },
+  "devDependencies": {
+    "@lhci/cli": "0.15.1",
+    "oxfmt": "0.46.0",
+    "oxlint": "1.34.0",
+    "postcss-html": "1.8.1",
+    "stylelint": "17.8.0",
+    "stylelint-config-standard": "40.0.0",
+    "turbo": "2.5.8",
+    "typescript": "5.9.2"
+  },
+  "packageManager": "bun@1.3.13",
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

@@ -1,0 +1,12 @@
+opencollection: 1.0.0
+info:
+  name: "tokenoverflow"
+  type: workspace
+
+collections:
+  - name: "api"
+    path: "collections/api"
+
+specs:
+
+docs: ''

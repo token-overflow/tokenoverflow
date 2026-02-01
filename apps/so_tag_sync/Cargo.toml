@@ -1,0 +1,68 @@
+[package]
+name = "so_tag_sync"
+version = "0.0.1"
+edition = "2024"
+rust-version = "1.93"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
+
+[lib]
+name = "so_tag_sync"
+path = "src/lib.rs"
+
+[[bin]]
+name = "so_tag_sync"
+path = "src/main.rs"
+
+[[test]]
+name = "unit"
+path = "tests/unit/mod.rs"
+
+[[test]]
+name = "integration"
+path = "tests/integration/mod.rs"
+
+[dependencies]
+# CLI argument parsing
+clap = { version = "4", features = ["derive"] }
+
+# HTTP client for Stack Overflow API
+reqwest = { version = "0.12", features = ["json", "gzip"] }
+
+# JSON serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Structured logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# ORM for database operations
+diesel = { version = "2.2", features = ["postgres", "chrono", "uuid"] }
+
+# Async Diesel with bb8 connection pooling
+diesel-async = { version = "0.5", features = ["postgres", "bb8"] }
+
+# Chrono for timestamps
+chrono = { version = "0.4", features = ["serde"] }
+
+# Layered configuration from TOML files
+config = { version = "0.14", features = ["toml"] }
+
+
+# UUID types for tag ID handling
+uuid = { version = "1", features = ["v4"] }
+
+# Error handling
+anyhow = "1"
+
+[dev-dependencies]
+ctor = "0.4"
+tempfile = "3"
+wiremock = "0.6"
+testcontainers = { version = "0.27", features = ["watchdog"] }
+tokio = { version = "1", features = ["full", "test-util"] }
