@@ -1,0 +1,51 @@
+info:
+  name: authenticate
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/health"
+  auth:
+    type: oauth2
+    flow: authorization_code
+    authorizationUrl: https://intimate-figure-17.authkit.app/oauth2/authorize
+    accessTokenUrl: https://intimate-figure-17.authkit.app/oauth2/token
+    refreshTokenUrl: https://intimate-figure-17.authkit.app/oauth2/token
+    callbackUrl: https://api.tokenoverflow.io/auth/callback
+    credentials:
+      clientId: client_01KN38Y925JA8QF8RC44683JY4
+      clientSecret: "{{client_secret}}"
+      placement: body
+    scope: openid profile
+    pkce:
+      disabled: true
+    tokenConfig:
+      id: credentials
+      placement:
+        header: Bearer
+      source: access_token
+    settings:
+      autoFetchToken: true
+      autoRefreshToken: true
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const authHeader = req.getHeader('Authorization');
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          bru.setEnvVar('access_token', authHeader.substring(7));
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  1. Switch to a non-local environment
+  2. Click on Auth > Get Access Token
+  3. Make a request to trigger the post response script
+  4. Now you can call authenticated endpoints

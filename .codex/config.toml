@@ -1,0 +1,25 @@
+#:schema https://developers.openai.com/codex/config-schema.json
+model = "gpt-5.4"
+model_provider = "openai"
+model_verbosity = "high"
+model_personality = "pragmatic"
+model_reasoning_effort = "high"
+model_reasoning_summary = "detailed"
+model_supports_reasoning_summaries = true
+
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+
+web_search = "live"
+file_opener = "vscode"
+hide_agent_reasoning = false
+check_for_update_on_startup = true
+
+[history]
+persistence = "save-all"
+
+[analytics]
+enabled = false
+
+[feedback]
+enabled = false

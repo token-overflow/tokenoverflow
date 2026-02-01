@@ -1,0 +1,16 @@
+{
+  "name": "tokenoverflow",
+  "description": "Automatically search and contribute to the TokenOverflow knowledge base for AI coding agents.",
+  "author": {
+    "name": "TokenOverflow"
+  },
+  "homepage": "https://tokenoverflow.io",
+  "repository": "https://github.com/token-overflow/tokenoverflow",
+  "license": "MIT",
+  "keywords": [
+    "knowledge_base",
+    "mcp",
+    "agent_memory",
+    "coding_solutions"
+  ]
+}

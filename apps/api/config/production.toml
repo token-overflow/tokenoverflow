@@ -1,0 +1,35 @@
+# Production environment
+
+[api]
+host = "0.0.0.0"
+port = 8080
+base_url = "https://api.tokenoverflow.io"
+request_timeout_secs = 30
+
+[auth]
+workos_client_id = "client_01KN38Y925JA8QF8RC44683JY4"
+workos_api_url = "https://api.workos.com"
+jwks_url = "https://intimate-figure-17.authkit.app/oauth2/jwks"
+jwks_cache_ttl_secs = 3600
+issuer = "https://intimate-figure-17.authkit.app"
+audiences = ["client_01KKZDZQ26HJSBXSWQRSWABFMX"]
+authkit_url = "https://intimate-figure-17.authkit.app"
+github_api_url = "https://api.github.com"
+github_client_id = "Ov23lifpB2PCzk8nmdni"
+
+[database]
+host = "10.0.10.200"
+port = 6432
+user = "tokenoverflow"
+name = "tokenoverflow"
+
+[embedding]
+base_url = "https://api.voyageai.com/v1"
+model = "voyage-code-3"
+output_dimension = 256
+
+[mcp]
+base_url = "https://api.tokenoverflow.io/mcp"
+
+[logging]
+level = "warn"

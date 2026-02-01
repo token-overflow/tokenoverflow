@@ -1,0 +1,14 @@
+scan:
+  # Skip generated/build artifact directories. Trivy detects vulnerable
+  # dependencies from lockfiles (Cargo.lock, package-lock.json) at the
+  # project root - it does not need compiled output. Scanning these dirs
+  # causes transient failures when build artifacts are modified mid-scan.
+  skip-dirs:
+    - target
+    - node_modules
+    - .terraform
+    - .terragrunt-cache
+    - dist
+    - coverage
+    - .fastembed_cache
+    - postgres_data

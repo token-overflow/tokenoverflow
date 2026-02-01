@@ -1,0 +1,41 @@
+use rmcp::model::{Extensions, RequestId};
+use rmcp::service::{
+    RequestContext, RoleServer, RxJsonRpcMessage, TxJsonRpcMessage, serve_directly,
+};
+use tokenoverflow::api::extractors::AuthenticatedUser;
+
+/// Dummy handler to bootstrap a Peer via serve_directly
+struct DummyHandler;
+
+impl rmcp::handler::server::ServerHandler for DummyHandler {}
+
+/// Create test context for MCP requests.
+///
+/// Spawns a dummy service to obtain a `Peer<RoleServer>` since `Peer::new`
+/// is crate-private in rmcp 0.13. Injects a fake `http::request::Parts` with
+/// an `AuthenticatedUser` to mirror what the real server provides via
+/// jwt_auth_layer + rmcp's automatic Parts injection.
+pub(super) fn test_context() -> RequestContext<RoleServer> {
+    let dummy_stream = futures::stream::pending::<RxJsonRpcMessage<RoleServer>>();
+    let dummy_sink = futures::sink::drain::<TxJsonRpcMessage<RoleServer>>();
+    let running = serve_directly(DummyHandler, (dummy_sink, dummy_stream), None);
+    let peer = running.peer().clone();
+
+    // Build http::request::Parts with AuthenticatedUser in its extensions,
+    // matching what jwt_auth_layer injects in production.
+    let (mut parts, _body) = http::Request::builder()
+        .body(())
+        .expect("empty request must build")
+        .into_parts();
+    parts.extensions.insert(AuthenticatedUser {
+        id: tokenoverflow::constants::SYSTEM_USER_ID,
+        workos_id: "system".to_string(),
+    });
+
+    let mut extensions = Extensions::new();
+    extensions.insert(parts);
+
+    let mut ctx = RequestContext::new(RequestId::Number(0), peer);
+    ctx.extensions = extensions;
+    ctx
+}

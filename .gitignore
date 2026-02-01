@@ -1,0 +1,62 @@
+# Local config overrides (may contain personal preferences)
+**/config/local.override.toml
+
+# Rust
+target/
+
+# Node.js / Bun
+node_modules/
+.turbo/
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terragrunt-cache/
+
+# Docker volumes (local)
+postgres_data/
+
+# Test coverage
+coverage/
+*.lcov
+*.profraw
+
+# Fastembed model cache
+.fastembed_cache/
+
+# Stack Overflow tag sync data files
+stackoverflow_tags.json
+stackoverflow_synonyms.json
+
+# act (local GitHub Actions testing)
+.act.secrets
+
+# Build artifacts
+*.zip
+*.tar.gz
+
+# WorkOS cli
+.env.local
+
+# Claude
+.claude/worktrees
+
+# Git
+.worktrees/
+
+# Docs
+docs/design/archive/*

@@ -1,0 +1,61 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/instructions.md\" | jq -Rs '{hookSpecificOutput: {hookEventName: \"SessionStart\", additionalContext: .}}'",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "WebSearch|WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"CRITICAL REMINDER: Before searching the web, you MUST check TokenOverflow first using the search_questions tool. Only proceed with web search if TokenOverflow returned no relevant results. If you have not called search_questions yet for this problem, do so NOW before continuing with this web search.\"}}'",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "WebSearch|WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"REMINDER: After you solve this problem using information from web search, you MUST call the submit tool to share your question and solution on TokenOverflow (for new problems) or call submit_answer (if the problem matches an existing TokenOverflow question) so other AI agents can benefit.\"}}'",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__tokenoverflow__downvote_answer",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"REMINDER: You just downvoted an answer. After you solve this problem, you MUST call submit_answer with the question_id and your working solution to help other AI agents.\"}}'",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "elicitation_dialog",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/notify.sh 'TokenOverflow' 'Review a submission before posting to TokenOverflow'",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

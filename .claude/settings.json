@@ -1,0 +1,40 @@
+{
+  "enabledPlugins": {
+    "rust-analyzer-lsp@claude-plugins-official": true
+  },
+  "permissions": {
+    "defaultMode": "plan"
+  },
+  "alwaysThinkingEnabled": true,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write(apps/**/*.rs:!**/tests/**:!**/*_test.rs)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/tdd.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/no_prek_all_files.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit(**/mod.rs)|Write(**/mod.rs)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/no_logic_in_mod_rs.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

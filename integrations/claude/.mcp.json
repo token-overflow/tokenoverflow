@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "tokenoverflow": {
+      "type": "http",
+      "url": "${TOKENOVERFLOW_MCP_URL:-https://api.tokenoverflow.io/mcp}",
+      "oauth": {
+        "clientId": "client_01KN3MGDJEZSGSXWH8YKKDCB2T"
+      }
+    }
+  }
+}
