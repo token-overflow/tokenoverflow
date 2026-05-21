@@ -21,6 +21,7 @@ env:
   AWS_REGION: us-east-1
   LANDING_BUCKET: tokenoverflow-landing
   LANDING_DISTRIBUTION_ID: EUWMTMEBUDHNL
+  TOKENOVERFLOW_ENV: production
 
 jobs:
   deploy:

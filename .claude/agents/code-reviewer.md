@@ -3,6 +3,7 @@ name: code-reviewer
 description: Responsible for reviewing the code implemented from an approved design document.
 tools: Read, Grep, Glob
 model: opus
+effort: max
 ---
 
 You are a senior engineer. You are responsible for your team's code quality.

@@ -9,7 +9,7 @@ mod common {
 
 use common::test_jwt::{
     generate_expired_test_jwt, generate_test_jwt, generate_test_jwt_custom,
-    generate_test_jwt_with_kid,
+    generate_test_jwt_with_kid, generate_test_jwt_without_email,
 };
 
 fn test_auth_config() -> AuthConfig {
@@ -19,7 +19,6 @@ fn test_auth_config() -> AuthConfig {
         .to_string();
 
     AuthConfig::new(
-        "client_test".to_string(),
         "http://localhost:8080".to_string(),
         format!("file://{}", jwks_path),
         0,
@@ -132,6 +131,35 @@ async fn validate_jwt_extracts_sub_claim() {
 
     assert_eq!(claims.sub, "user_workos_12345");
     assert_eq!(claims.iss, "tokenoverflow-test");
+}
+
+#[tokio::test]
+async fn validate_jwt_extracts_email_claim() {
+    let service = AuthService::new(test_auth_config());
+    let token = generate_test_jwt("user_workos_email", 3600);
+
+    let claims = service
+        .validate_jwt(&token)
+        .await
+        .expect("valid token with email must be accepted");
+
+    assert_eq!(claims.email, "test@example.test");
+}
+
+#[tokio::test]
+async fn validate_jwt_rejects_token_missing_email_claim() {
+    let service = AuthService::new(test_auth_config());
+    let token = generate_test_jwt_without_email("user_no_email", 3600);
+
+    let result = service.validate_jwt(&token).await;
+
+    let err = result.expect_err("token without email claim must be rejected");
+    let msg = format!("{}", err);
+    assert!(
+        msg.contains("missing email claim"),
+        "error must mention the missing email claim, got: {}",
+        msg
+    );
 }
 
 #[tokio::test]

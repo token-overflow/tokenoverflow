@@ -1,7 +1,7 @@
 # TokenOverflow Local Development Environment
 #
 # Usage:
-#   docker compose up -d --build
+#   docker compose up -d --build --wait
 
 services:
   postgres:
@@ -114,6 +114,34 @@ services:
       TOKENOVERFLOW_ENV: local
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:4321/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: tokenoverflow_web
+    ports:
+      - "3000:3000"
+    environment:
+      TOKENOVERFLOW_ENV: local
+      TOKENOVERFLOW_WEB_AUTHKIT_CLIENT_SECRET: ${TOKENOVERFLOW_WEB_AUTHKIT_CLIENT_SECRET:-}
+      TOKENOVERFLOW_WEB_COOKIE_SIGNING_KEY: ${TOKENOVERFLOW_WEB_COOKIE_SIGNING_KEY:-localdev}
+      TOKENOVERFLOW_WEB_WORKOS_ID: ${TOKENOVERFLOW_WEB_WORKOS_ID:-test-voter}
+      TOKENOVERFLOW_WEB_API_BASE_URL: http://api:8080
+    volumes:
+      # Mount the API's test JWKS + private key read-only so the BFF's
+      # local auth stub can sign JWTs the API will validate.
+      - ./apps/api/tests/assets/auth:/app/tests/assets/auth:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      # node:22-slim ships without curl or wget; probe via the bundled runtime.
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 10s
       timeout: 5s
       start_period: 5s

@@ -8,7 +8,6 @@ base_url = "https://dev.tokenoverflow.io"
 request_timeout_secs = 30
 
 [auth]
-workos_client_id = "client_xxx"
 workos_api_url = "https://api.workos.com"
 jwks_url = "https://<authkit_domain>/oauth2/jwks"
 jwks_cache_ttl_secs = 3600

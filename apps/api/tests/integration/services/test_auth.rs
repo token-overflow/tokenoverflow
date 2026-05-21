@@ -8,7 +8,7 @@ mod common {
     include!("../../common/mod.rs");
 }
 
-use common::mock_repository::MockUserRepository;
+use common::mock_repository::{MockUserRepository, MockWaitlistRepository};
 use common::test_jwt::generate_test_jwt_custom;
 
 /// JWKS JSON matching the test private key (same as tests/assets/auth/test_jwks.json).
@@ -23,9 +23,12 @@ const TEST_JWKS_JSON: &str = r#"{
     }]
 }"#;
 
+/// JIT-provisioning tests below predate the waitlist gate; they exercise
+/// the rollout-deprecation path where `require_waitlist_approval = false`
+/// reverts `resolve_user` to plain find-or-create. Gate ON branches have
+/// dedicated coverage in `auth_resolve_user_gate.rs`.
 fn auth_config_for_mock(mock_server_uri: &str) -> AuthConfig {
     let mut config = AuthConfig::new(
-        "client_test".to_string(),
         mock_server_uri.to_string(),
         format!("{}/jwks", mock_server_uri),
         0, // no caching to ensure each test hits the mock
@@ -39,7 +42,14 @@ fn auth_config_for_mock(mock_server_uri: &str) -> AuthConfig {
         "test_client_id".to_string(),
         "test_client_secret".to_string(),
     );
+    config.set_require_waitlist_approval_for_test(false);
     config
+}
+
+/// Empty waitlist repo for the rollout-deprecation tests below: the gate
+/// is off, so `resolve_user` never consults the waitlist.
+fn empty_waitlist_repo() -> MockWaitlistRepository {
+    MockWaitlistRepository::new(common::MockStore::new())
 }
 
 /// Mount wiremock stubs for the JIT provisioning happy path:
@@ -147,7 +157,12 @@ async fn resolve_user_returns_existing_user() {
     let mut conn = common::NoopConn;
 
     let user = service
-        .resolve_user(&user_repo, &mut conn, "user_existing")
+        .resolve_user(
+            &user_repo,
+            &empty_waitlist_repo(),
+            &mut conn,
+            "user_existing",
+        )
         .await
         .expect("should find existing user");
 
@@ -172,7 +187,12 @@ async fn resolve_user_creates_user_via_workos_api() {
     let mut conn = common::NoopConn;
 
     let user = service
-        .resolve_user(&user_repo, &mut conn, "user_new_jit")
+        .resolve_user(
+            &user_repo,
+            &empty_waitlist_repo(),
+            &mut conn,
+            "user_new_jit",
+        )
         .await
         .expect("should create user from WorkOS profile");
 
@@ -187,7 +207,6 @@ async fn resolve_user_handles_missing_api_key() {
 
     // Config without WorkOS API key set
     let config = AuthConfig::new(
-        "client_test".to_string(),
         mock_server.uri(),
         format!("{}/jwks", mock_server.uri()),
         0,
@@ -202,7 +221,7 @@ async fn resolve_user_handles_missing_api_key() {
     let mut conn = common::NoopConn;
 
     let result = service
-        .resolve_user(&user_repo, &mut conn, "user_no_key")
+        .resolve_user(&user_repo, &empty_waitlist_repo(), &mut conn, "user_no_key")
         .await;
 
     assert!(
@@ -248,7 +267,12 @@ async fn resolve_user_resolves_github_username_and_id() {
     let mut conn = common::NoopConn;
 
     let user = service
-        .resolve_user(&user_repo, &mut conn, "user_minimal")
+        .resolve_user(
+            &user_repo,
+            &empty_waitlist_repo(),
+            &mut conn,
+            "user_minimal",
+        )
         .await
         .expect("should resolve GitHub username and ID");
 
@@ -274,7 +298,12 @@ async fn resolve_user_handles_identities_api_failure() {
     let mut conn = common::NoopConn;
 
     let result = service
-        .resolve_user(&user_repo, &mut conn, "user_ident_fail")
+        .resolve_user(
+            &user_repo,
+            &empty_waitlist_repo(),
+            &mut conn,
+            "user_ident_fail",
+        )
         .await;
     assert!(
         result.is_err(),
@@ -300,7 +329,7 @@ async fn resolve_user_handles_no_github_identity() {
     let mut conn = common::NoopConn;
 
     let result = service
-        .resolve_user(&user_repo, &mut conn, "user_no_gh")
+        .resolve_user(&user_repo, &empty_waitlist_repo(), &mut conn, "user_no_gh")
         .await;
     assert!(
         result.is_err(),
@@ -336,7 +365,12 @@ async fn resolve_user_handles_github_api_failure() {
     let mut conn = common::NoopConn;
 
     let result = service
-        .resolve_user(&user_repo, &mut conn, "user_gh_fail")
+        .resolve_user(
+            &user_repo,
+            &empty_waitlist_repo(),
+            &mut conn,
+            "user_gh_fail",
+        )
         .await;
     assert!(result.is_err(), "should fail when GitHub API returns 500");
 }
@@ -371,7 +405,7 @@ async fn resolve_user_handles_github_api_not_found() {
     let mut conn = common::NoopConn;
 
     let result = service
-        .resolve_user(&user_repo, &mut conn, "user_gh_404")
+        .resolve_user(&user_repo, &empty_waitlist_repo(), &mut conn, "user_gh_404")
         .await;
     assert!(result.is_err(), "should fail when GitHub API returns 404");
 }
@@ -403,7 +437,6 @@ async fn resolve_user_falls_back_to_unauthenticated_github_api() {
 
     // Config with WorkOS API key but without GitHub API token
     let mut config = AuthConfig::new(
-        "client_test".to_string(),
         mock_server.uri(),
         format!("{}/jwks", mock_server.uri()),
         0,
@@ -414,13 +447,21 @@ async fn resolve_user_falls_back_to_unauthenticated_github_api() {
     );
     config.set_workos_api_key_for_test("sk_test_fake_key".to_string());
     // Deliberately NOT setting github_oauth credentials
+    // Pre-gate test: stay on the rollout-deprecation path so this
+    // exercises the unauthenticated-GitHub-API behavior end-to-end.
+    config.set_require_waitlist_approval_for_test(false);
 
     let service = AuthService::new(config);
     let user_repo = MockUserRepository::new();
     let mut conn = common::NoopConn;
 
     let user = service
-        .resolve_user(&user_repo, &mut conn, "user_no_gh_token")
+        .resolve_user(
+            &user_repo,
+            &empty_waitlist_repo(),
+            &mut conn,
+            "user_no_gh_token",
+        )
         .await
         .expect("should succeed with unauthenticated GitHub API call");
 
@@ -448,7 +489,7 @@ async fn resolve_user_handles_non_numeric_github_id() {
     let mut conn = common::NoopConn;
 
     let result = service
-        .resolve_user(&user_repo, &mut conn, "user_bad_id")
+        .resolve_user(&user_repo, &empty_waitlist_repo(), &mut conn, "user_bad_id")
         .await;
     assert!(result.is_err(), "should fail when GitHub ID is not numeric");
 }
@@ -471,7 +512,12 @@ async fn resolve_user_handles_malformed_identities_response() {
     let mut conn = common::NoopConn;
 
     let result = service
-        .resolve_user(&user_repo, &mut conn, "user_bad_ident")
+        .resolve_user(
+            &user_repo,
+            &empty_waitlist_repo(),
+            &mut conn,
+            "user_bad_ident",
+        )
         .await;
     assert!(
         result.is_err(),
@@ -513,7 +559,7 @@ async fn resolve_user_handles_malformed_github_user_response() {
     let mut conn = common::NoopConn;
 
     let result = service
-        .resolve_user(&user_repo, &mut conn, "user_bad_gh")
+        .resolve_user(&user_repo, &empty_waitlist_repo(), &mut conn, "user_bad_gh")
         .await;
     assert!(
         result.is_err(),

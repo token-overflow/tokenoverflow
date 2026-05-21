@@ -188,11 +188,12 @@ claude_plugin
 **Summary:**
 
 - Authentication uses WorkOS AuthKit (GitHub OAuth)
-- There are two OAuth apps:
-    - **Confidential client**: for apps that can store a secret (Bruno, web app...)
+- There are three OAuth apps:
+    - **Confidential clients**: for apps that can store a secret
+      (Bruno and Web)
     - **Public client**: for distributed clients with no
-      secrets, uses PKCE (Claude Code...)
-- Both apps issue compatible access tokens for the same API
+      secrets, uses PKCE (MCP)
+- All apps issue compatible access tokens for the same API
 - The Claude Code plugin includes a hard-coded `clientId`
   to avoid uncontrolled auto-created apps (CIMD)
 - An OAuth proxy exists only to fix a Claude Code

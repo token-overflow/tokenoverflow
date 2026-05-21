@@ -7,6 +7,7 @@ use crate::db::DbPool;
 use crate::external::embedding::EmbeddingService;
 use crate::services::repository::{
     AnswerRepository, QuestionRepository, SearchRepository, TagRepository, UserRepository,
+    WaitlistRepository,
 };
 use crate::services::{AuthService, TagResolver};
 
@@ -34,6 +35,9 @@ pub struct AppState {
     /// User persistence
     pub users: Arc<dyn UserRepository<AsyncPgConnection> + Sync>,
 
+    /// Waitlist persistence
+    pub waitlist: Arc<dyn WaitlistRepository<AsyncPgConnection> + Sync>,
+
     /// In-memory tag resolver (synonym + canonical + Jaro-Winkler)
     pub tag_resolver: Arc<TagResolver>,
 
@@ -57,6 +61,7 @@ impl AppState {
         search: Arc<dyn SearchRepository<AsyncPgConnection> + Sync>,
         tags: Arc<dyn TagRepository<AsyncPgConnection> + Sync>,
         users: Arc<dyn UserRepository<AsyncPgConnection> + Sync>,
+        waitlist: Arc<dyn WaitlistRepository<AsyncPgConnection> + Sync>,
         tag_resolver: Arc<TagResolver>,
         auth: Arc<AuthService>,
         auth_config: AuthConfig,
@@ -70,6 +75,7 @@ impl AppState {
             search,
             tags,
             users,
+            waitlist,
             tag_resolver,
             auth,
             auth_config,

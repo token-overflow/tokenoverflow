@@ -7,45 +7,60 @@ Should be executed by the `design-lead` subagent.
 
 You **must** follow the steps below:
 
-1. ALWAYS make sure the git stage is clean! If not, ask the user to clean up.
-2. Once the stage is clean, create a new branch from the latest `origin/main`:
-    - Run: `git fetch origin main && git checkout -b <branch_name> origin/main`
-    - Branch naming: `feature/...`, `bugfix/...`, `hotfix/...`, `chore/...`,
-      `refactor/...`, `docs/...`
-3. Read `docs/brief/2026_01_31_tokenoverflow.md` and `README.md`.
-4. If provided in the user's message, read the PRD carefully.
-5. Run `source scripts/src/includes.sh` and
+1. Run `source scripts/src/includes.sh` and
    `create_doc design <feature_name>` to create the design document.
-6. Read the generated template under `docs/design/` and grok the structure.
-7. Ask clarifying questions about the design if you are not sure of anything.
-8. Use subagents to do deep research online.
+2. Read the generated template under `docs/design/` and grok the structure.
+3. If provided in the user's message, read the PRD carefully.
+4. Read `docs/brief/2026_01_31_tokenoverflow.md`, source code and `README.md`
+    of the relevant directories.
+5. **CRITICAL:** Relentlessly ask clarifying questions to make sure you and
+    the user reach a common understanding. This discussion will drive your
+    following research.
+6. Spawn a subagent to do deep research online:
+    - For each non-trivial capability the work will touch, look for battle-tested
+    libraries with strong adoptions signals before considering hand-rolling. Provide
+    a comparison table to let the user decide.
+    - Ensure compliance with governing standards (RFC, W3C, framework conventions,
+    specs, etc.).
+    - Look for industry best practices and how other projects have solved similar
+    problems.
+    - Verify and double check your assumptions with up-to-date information.
     - Keep track of all research learnings, make sure they are never lost.
-9. Identify the key design decisions that will drive the direction of the design.
-10. For each key design decision:
+7. If you are still unsure of something and see a potential risk, spike it via a.
+    subagent. Prototype, test, and de-risk right away. We cannot afford to wait
+    until the end.
+8. Using all the information you have gathered with the research, spikes, and the
+    the discussions, define the list of key design decisions that will drive the
+    direction of the design.
+9. For each key design decision to be made:
     - State the problem and the question.
     - Provide multiple alternatives with trade-offs in a table.
     - Give examples of what each option would look like in practice.
     - Let the user decide which option to pick.
     - Ask for approval before moving to the next section.
-11. Once all key decisions are made, fill out the entire design document.
-12. If a PRD was provided, make sure all its requirements are now satisfied.
-13. Get a review from the `design-reviewer` subagent. For each finding, ask the user's approval.
-14. Once done, ask for a review and keep iterating until you get approval.
+10. Once all key decisions are made, fill out the entire design document.
+11. If a PRD was provided, make sure all its requirements are now satisfied.
+12. Get a review from the `design-reviewer` subagent. For each finding, ask the
+    user's approval.
+13. Once done, ask for a review and keep iterating until you get approval.
 
 Guidelines you **must** follow:
 
-- Prevent scope creep by sticking to the original requirements.
-- Never try to re-invent the wheel. Research best practices using subagents.
-- When introducing new libraries, always check if they are well-maintained.
+- Cut down on scope as much as possible. Only include what is needed.
+- Never re-implement a feature from scratch if a battle-tested, widely-adopted,
+    and well-maintained library exists.
+- Ensure the interfaces, structures, and any conventions you introduce follow
+    the industry best practices.
 - When iterating on the design, do not reference previous iterations. The
   document should always read as the target state, not as a changelog.
-- Ensure every design follows industry best practices without taking any
-  shortcuts or reaching for hacks.
 - Ensure the design respects the current architecture and coding standards.
 - Use the latest version of dependencies unless there is a strong reason not to.
 - Do not edit historical design documents.
-- Advocate for simplicity.
+- Ruthlessly optimize for simplicity and maintainability. Always ask yourself
+    if there is a simpler and more scalable way to achieve the same goal.
+- Focus on the key decisions, overall architecture, interfaces, structures, and
+    patterns rather than implementation details.
 
 **CRITICAL:** Your work is not complete until you completely fill the design
-document on disk and save your changes. Do not leave an empty template. Do not
-make any git commits.
+document on disk and save your changes. Do not leave an empty template. Do
+not make any git commits.

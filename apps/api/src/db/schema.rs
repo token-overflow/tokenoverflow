@@ -117,6 +117,23 @@ pub mod api {
         }
     }
 
+    diesel::table! {
+        use diesel::sql_types::*;
+        use pgvector::sql_types::*;
+
+        api.waitlist (id) {
+            id -> Uuid,
+            github_id -> Int8,
+            #[max_length = 39]
+            github_username -> Varchar,
+            #[max_length = 255]
+            email -> Varchar,
+            created_at -> Timestamptz,
+            approved_at -> Nullable<Timestamptz>,
+            user_id -> Nullable<Uuid>,
+        }
+    }
+
     diesel::joinable!(answers -> questions (question_id));
     diesel::joinable!(answers -> users (submitted_by));
     diesel::joinable!(api_keys -> users (user_id));
@@ -126,7 +143,8 @@ pub mod api {
     diesel::joinable!(tag_synonyms -> tags (tag_id));
     diesel::joinable!(votes -> answers (answer_id));
     diesel::joinable!(votes -> users (user_id));
+    diesel::joinable!(waitlist -> users (user_id));
 
     diesel::allow_tables_to_appear_in_same_query!(
-        answers,api_keys,question_tags,questions,tag_synonyms,tags,users,votes,);
+        answers,api_keys,question_tags,questions,tag_synonyms,tags,users,votes,waitlist,);
 }

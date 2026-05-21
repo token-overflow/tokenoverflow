@@ -11,10 +11,11 @@ use tokenoverflow::api::types::{
     AnswerResponse, CreateQuestionResponse, QuestionWithAnswers, SearchResultQuestion,
 };
 use tokenoverflow::constants::SYSTEM_USER_ID;
-use tokenoverflow::db::models::{NewUser, User};
+use tokenoverflow::db::models::{NewUser, User, WaitlistEntry};
 use tokenoverflow::error::AppError;
 use tokenoverflow::services::repository::{
     AnswerRepository, QuestionRepository, SearchRepository, TagRepository, UserRepository,
+    WaitlistInsert, WaitlistRepository,
 };
 
 // ---------------------------------------------------------------------------
@@ -74,6 +75,17 @@ pub struct StoredSynonym {
     pub canonical: String,
 }
 
+#[derive(Clone, Debug)]
+pub struct StoredWaitlistEntry {
+    pub id: Uuid,
+    pub github_id: i64,
+    pub github_username: String,
+    pub email: String,
+    pub created_at: chrono::DateTime<Utc>,
+    pub approved_at: Option<chrono::DateTime<Utc>>,
+    pub user_id: Option<Uuid>,
+}
+
 // ---------------------------------------------------------------------------
 // Shared in-memory store
 // ---------------------------------------------------------------------------
@@ -86,6 +98,7 @@ pub struct MockStore {
     pub question_tags: Arc<Mutex<Vec<StoredQuestionTag>>>,
     pub tags: Arc<Mutex<Vec<StoredTag>>>,
     pub synonyms: Arc<Mutex<Vec<StoredSynonym>>>,
+    pub waitlist: Arc<Mutex<Vec<StoredWaitlistEntry>>>,
 }
 
 impl MockStore {
@@ -97,6 +110,7 @@ impl MockStore {
             question_tags: Arc::new(Mutex::new(Vec::new())),
             tags: Arc::new(Mutex::new(Vec::new())),
             synonyms: Arc::new(Mutex::new(Vec::new())),
+            waitlist: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -818,6 +832,28 @@ impl MockUserRepository {
             updated_at: now,
         });
     }
+
+    /// Pre-seed a user with a known `github_id` and `username` so handlers
+    /// that hydrate the GitHub identity (for example the waitlist handler)
+    /// have something to read.
+    pub fn seed_github_user(&self, workos_id: &str, github_id: i64, username: &str) {
+        let mut users = self.users.lock().unwrap();
+        if let Some(existing) = users.iter_mut().find(|u| u.workos_id == workos_id) {
+            existing.github_id = Some(github_id);
+            existing.username = username.to_string();
+            return;
+        }
+        let id = next_id();
+        let now = Utc::now();
+        users.push(User {
+            id,
+            workos_id: workos_id.to_string(),
+            github_id: Some(github_id),
+            username: username.to_string(),
+            created_at: now,
+            updated_at: now,
+        });
+    }
 }
 
 #[async_trait]
@@ -917,6 +953,162 @@ impl<Conn: Send + 'static> TagRepository<Conn> for FailingTagRepository {
         _conn: &mut Conn,
         _question_id: Uuid,
     ) -> Result<Vec<String>, AppError> {
+        Err(AppError::Internal("mock repository failure".to_string()))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MockWaitlistRepository
+// ---------------------------------------------------------------------------
+
+pub struct MockWaitlistRepository {
+    store: MockStore,
+}
+
+impl MockWaitlistRepository {
+    pub fn new(store: MockStore) -> Self {
+        Self { store }
+    }
+
+    /// Seed an approved waitlist row tied to an existing `api.users` row.
+    /// Used by `seed_user_with_approval` so authenticated integration tests
+    /// match the gate ON path that prod runs.
+    pub fn seed_approved(&self, github_id: i64, github_username: &str, user_id: Uuid) {
+        let mut entries = self.store.waitlist.lock().unwrap();
+        if entries.iter().any(|e| e.github_id == github_id) {
+            return;
+        }
+        let now = Utc::now();
+        entries.push(StoredWaitlistEntry {
+            id: next_id(),
+            github_id,
+            github_username: github_username.to_string(),
+            email: format!("{}@example.test", github_username),
+            created_at: now,
+            approved_at: Some(now),
+            user_id: Some(user_id),
+        });
+    }
+
+    /// Seed a pending (not yet approved) waitlist row. Used by gate
+    /// branch tests that exercise the `WaitlistPending` outcome.
+    pub fn seed_pending(&self, github_id: i64, github_username: &str) {
+        let mut entries = self.store.waitlist.lock().unwrap();
+        if entries.iter().any(|e| e.github_id == github_id) {
+            return;
+        }
+        entries.push(StoredWaitlistEntry {
+            id: next_id(),
+            github_id,
+            github_username: github_username.to_string(),
+            email: format!("{}@example.test", github_username),
+            created_at: Utc::now(),
+            approved_at: None,
+            user_id: None,
+        });
+    }
+}
+
+#[async_trait]
+impl<Conn: Send + 'static> WaitlistRepository<Conn> for MockWaitlistRepository {
+    async fn insert(
+        &self,
+        _conn: &mut Conn,
+        github_id: i64,
+        github_username: &str,
+        email: &str,
+    ) -> Result<WaitlistInsert, AppError> {
+        let mut entries = self.store.waitlist.lock().unwrap();
+
+        if let Some(existing) = entries.iter().find(|e| e.github_id == github_id) {
+            return Ok(WaitlistInsert {
+                id: existing.id,
+                created_at: existing.created_at,
+                already_existed: true,
+            });
+        }
+
+        let id = next_id();
+        let now = Utc::now();
+        entries.push(StoredWaitlistEntry {
+            id,
+            github_id,
+            github_username: github_username.to_string(),
+            email: email.to_string(),
+            created_at: now,
+            approved_at: None,
+            user_id: None,
+        });
+
+        Ok(WaitlistInsert {
+            id,
+            created_at: now,
+            already_existed: false,
+        })
+    }
+
+    async fn find_by_github_id(
+        &self,
+        _conn: &mut Conn,
+        github_id: i64,
+    ) -> Result<Option<WaitlistEntry>, AppError> {
+        let entries = self.store.waitlist.lock().unwrap();
+        Ok(entries
+            .iter()
+            .find(|e| e.github_id == github_id)
+            .map(|e| WaitlistEntry {
+                id: e.id,
+                github_id: e.github_id,
+                github_username: e.github_username.clone(),
+                email: e.email.clone(),
+                created_at: e.created_at,
+                approved_at: e.approved_at,
+                user_id: e.user_id,
+            }))
+    }
+
+    async fn set_user_id(
+        &self,
+        _conn: &mut Conn,
+        github_id: i64,
+        user_id: Uuid,
+    ) -> Result<(), AppError> {
+        let mut entries = self.store.waitlist.lock().unwrap();
+        if let Some(entry) = entries.iter_mut().find(|e| e.github_id == github_id) {
+            entry.user_id = Some(user_id);
+        }
+        Ok(())
+    }
+}
+
+pub struct FailingWaitlistRepository;
+
+#[async_trait]
+impl<Conn: Send + 'static> WaitlistRepository<Conn> for FailingWaitlistRepository {
+    async fn insert(
+        &self,
+        _conn: &mut Conn,
+        _github_id: i64,
+        _github_username: &str,
+        _email: &str,
+    ) -> Result<WaitlistInsert, AppError> {
+        Err(AppError::Internal("mock repository failure".to_string()))
+    }
+
+    async fn find_by_github_id(
+        &self,
+        _conn: &mut Conn,
+        _github_id: i64,
+    ) -> Result<Option<WaitlistEntry>, AppError> {
+        Err(AppError::Internal("mock repository failure".to_string()))
+    }
+
+    async fn set_user_id(
+        &self,
+        _conn: &mut Conn,
+        _github_id: i64,
+        _user_id: Uuid,
+    ) -> Result<(), AppError> {
         Err(AppError::Internal("mock repository failure".to_string()))
     }
 }

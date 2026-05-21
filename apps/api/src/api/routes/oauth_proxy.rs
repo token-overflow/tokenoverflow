@@ -60,7 +60,7 @@ pub async fn authorize(
 /// POST /oauth2/token
 ///
 /// Token exchange proxy. Forwards the form-encoded request body to AuthKit's
-/// token endpoint and returns the response as-is (status, headers, body).
+/// token endpoint and returns the response as-is (status, content-type, body).
 ///
 /// Handles both initial authorization code exchange and refresh token requests.
 ///

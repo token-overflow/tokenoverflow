@@ -93,13 +93,23 @@ pub async fn jwt_auth_layer(
             Box::pin(async move {
                 state
                     .auth
-                    .resolve_user(state.users.as_ref(), conn, &wid)
+                    .resolve_user(state.users.as_ref(), state.waitlist.as_ref(), conn, &wid)
                     .await
             })
         })
         .await
     {
         Ok(u) => u,
+        // MCP clients need a distinct error surface for waitlist denials
+        // so they do not loop on token refresh when the underlying issue
+        // is access (not authentication). REST callers receive the
+        // standard 403 + error-code body.
+        Err(AppError::WaitlistPending) if is_mcp => {
+            return mcp_waitlist_response(&state.api_base_url, WaitlistStatus::Pending);
+        }
+        Err(AppError::WaitlistRequired) if is_mcp => {
+            return mcp_waitlist_response(&state.api_base_url, WaitlistStatus::Required);
+        }
         Err(e) => return e.into_response(),
     };
 
@@ -152,6 +162,57 @@ fn mcp_unauthorized_response(api_base_url: &str) -> Response {
         [(header::WWW_AUTHENTICATE, www_auth)],
         axum::Json(ErrorBody {
             error: "Unauthorized".to_string(),
+        }),
+    )
+        .into_response()
+}
+
+/// Waitlist denial categories surfaced to MCP clients via the standard
+/// `WWW-Authenticate` `error_description` parameter (RFC 6750 S3.1).
+#[derive(Clone, Copy, Debug)]
+pub enum WaitlistStatus {
+    /// `api.waitlist` row exists but `approved_at IS NULL`.
+    Pending,
+    /// No `api.waitlist` row at all.
+    Required,
+}
+
+impl WaitlistStatus {
+    fn as_error_code(self) -> &'static str {
+        match self {
+            WaitlistStatus::Pending => "WAITLIST_PENDING",
+            WaitlistStatus::Required => "WAITLIST_REQUIRED",
+        }
+    }
+}
+
+/// Build a 403 response signalling a waitlist denial to an MCP client.
+///
+/// We use 403 (rather than 401) because the token is valid; the user
+/// lacks access. A 401 with `WWW-Authenticate` would prompt the client
+/// to refresh tokens in a loop, which never resolves the actual issue.
+///
+/// RFC 6750 S3.1 conformant
+pub fn mcp_waitlist_response(api_base_url: &str, status: WaitlistStatus) -> Response {
+    let www_auth = format!(
+        "Bearer error=\"insufficient_scope\", \
+         error_description=\"{}\", \
+         scope=\"openid profile offline_access\", \
+         resource_metadata=\"{}/.well-known/oauth-protected-resource\"",
+        status.as_error_code(),
+        api_base_url.trim_end_matches('/')
+    );
+
+    #[derive(serde::Serialize)]
+    struct ErrorBody {
+        error: &'static str,
+    }
+
+    (
+        StatusCode::FORBIDDEN,
+        [(header::WWW_AUTHENTICATE, www_auth)],
+        axum::Json(ErrorBody {
+            error: status.as_error_code(),
         }),
     )
         .into_response()

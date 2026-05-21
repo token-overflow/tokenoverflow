@@ -22,6 +22,12 @@ pub enum AppError {
     #[error("Embedding service unavailable: {0}")]
     EmbeddingUnavailable(String),
 
+    #[error("Waitlist application pending approval")]
+    WaitlistPending,
+
+    #[error("Waitlist application required")]
+    WaitlistRequired,
+
     #[error("Internal error: {0}")]
     Internal(String),
 }
@@ -71,11 +77,21 @@ struct ErrorResponse {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
+        // We surface waitlist denials as 403 + a machine-readable error
+        // string ("WAITLIST_PENDING" / "WAITLIST_REQUIRED") so non-MCP REST
+        // callers can branch on the value. MCP requests are intercepted
+        // earlier (in `jwt_auth_layer`) so they never reach this default
+        // mapping; see `mcp_waitlist_response` in `api::middleware`.
         let (status, message) = match &self {
             AppError::Validation(msg) => (StatusCode::UNPROCESSABLE_ENTITY, msg.clone()),
             AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
-            AppError::Unauthorized(_) => (StatusCode::UNAUTHORIZED, "Unauthorized".to_string()),
+            AppError::Unauthorized(msg) => {
+                tracing::warn!(reason = %msg, "unauthorized");
+                (StatusCode::UNAUTHORIZED, "Unauthorized".to_string())
+            }
             AppError::Forbidden(_) => (StatusCode::FORBIDDEN, "Forbidden".to_string()),
+            AppError::WaitlistPending => (StatusCode::FORBIDDEN, "WAITLIST_PENDING".to_string()),
+            AppError::WaitlistRequired => (StatusCode::FORBIDDEN, "WAITLIST_REQUIRED".to_string()),
             AppError::EmbeddingUnavailable(msg) => {
                 tracing::error!("Embedding service error: {}", msg);
                 (

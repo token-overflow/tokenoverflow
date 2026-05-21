@@ -11,7 +11,7 @@ SKIP=$(git ls-files --others --ignored --exclude-standard --directory \
   | paste -sd ',' -)
 
 if [ -n "$SKIP" ]; then
-  exec trivy fs --skip-dirs "$SKIP" .
+  exec trivy fs --disable-telemetry --exit-code 1 --severity='HIGH,CRITICAL' --skip-dirs "$SKIP" .
 else
-  exec trivy fs .
+  exec trivy fs --disable-telemetry --exit-code 1 --severity='HIGH,CRITICAL' .
 fi

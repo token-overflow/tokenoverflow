@@ -284,7 +284,6 @@ fn test_auth_config_loaded_from_unit_test_toml() {
 
     let config = Config::load().expect("Failed to load config");
 
-    assert_eq!(config.auth.workos_client_id, "client_test");
     assert_eq!(config.auth.workos_api_url, "http://localhost:8080");
     assert_eq!(
         config.auth.jwks_url,

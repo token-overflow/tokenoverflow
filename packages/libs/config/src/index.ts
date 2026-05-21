@@ -1,28 +1,16 @@
-import { parse } from "valibot";
-import { localConfig } from "./environments/local.js";
-import { productionConfig } from "./environments/production.js";
-import { type AppConfig, AppConfigSchema } from "./schema.js";
+import { localOverrides } from "./environments/local.js";
+import { productionOverrides } from "./environments/production.js";
+import { type AppConfig, configSchema } from "./schema.js";
 
-const ENVIRONMENTS = {
-  local: localConfig,
-  production: productionConfig,
-} as const satisfies Record<AppConfig["env"], AppConfig>;
+const env = configSchema.get("env");
 
-type EnvName = keyof typeof ENVIRONMENTS;
+if (env === "production") {
+  configSchema.load(productionOverrides);
+} else if (env === "local") {
+  configSchema.load(localOverrides);
+}
 
-const selectEnvironment = (raw: string | undefined): AppConfig => {
-  const name = raw === undefined || raw === "" ? "local" : raw;
-  if (!(name in ENVIRONMENTS)) {
-    throw new Error(`Invalid TOKENOVERFLOW_ENV=${raw}. Expected one of: local, production.`);
-  }
-  return ENVIRONMENTS[name as EnvName];
-};
+configSchema.validate({ allowed: "strict" });
 
-const loadConfig = (): Readonly<AppConfig> => {
-  const selected = selectEnvironment(process.env["TOKENOVERFLOW_ENV"]);
-  const parsed = parse(AppConfigSchema, selected);
-  return Object.freeze(parsed);
-};
-
-export const config: Readonly<AppConfig> = loadConfig();
-export { type AppConfig, AppConfigSchema } from "./schema.js";
+export const config: Readonly<AppConfig> = Object.freeze(configSchema.getProperties());
+export type { AppConfig } from "./schema.js";

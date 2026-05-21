@@ -1,6 +1,6 @@
 resource "aws_iam_openid_connect_provider" "github" {
-  url             = "https://token.actions.githubusercontent.com"
-  client_id_list  = ["sts.amazonaws.com"]
+  url            = "https://token.actions.githubusercontent.com"
+  client_id_list = ["sts.amazonaws.com"]
   # AWS verifies GitHub OIDC via trusted root CAs, not thumbprints.
   # Field is required by the schema but the value is not used.
   thumbprint_list = ["ffffffffffffffffffffffffffffffffffffffff"]

@@ -29,7 +29,8 @@ use crate::mcp::TokenOverflowServer;
 use crate::services::TagResolver;
 use crate::services::auth::create_auth_service;
 use crate::services::repository::{
-    PgAnswerRepository, PgQuestionRepository, PgSearchRepository, PgTagRepository, PgUserRepository,
+    PgAnswerRepository, PgQuestionRepository, PgSearchRepository, PgTagRepository,
+    PgUserRepository, PgWaitlistRepository,
 };
 
 // Tokio runtime bootstrap — needs a running server to exercise.
@@ -134,6 +135,7 @@ async fn create_app_state(
     let search = Arc::new(PgSearchRepository);
     let tag_repo = Arc::new(PgTagRepository);
     let users = Arc::new(PgUserRepository);
+    let waitlist = Arc::new(PgWaitlistRepository);
 
     // Load tag cache at startup
     let tag_resolver = {
@@ -151,6 +153,7 @@ async fn create_app_state(
         search,
         tag_repo,
         users,
+        waitlist,
         tag_resolver,
         auth,
         config.auth.clone(),

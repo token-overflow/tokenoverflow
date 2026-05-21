@@ -12,7 +12,9 @@ test("hero and CTA are visible on a mobile viewport", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveTitle(/TokenOverflow/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("AI coding agents");
-  await expect(page.getByRole("button", { name: /join the waitlist/i })).toBeVisible();
+  // The CTA is a top-level navigation `<a>` per the waitlist BFF design,
+  // so it surfaces with role=link rather than role=button.
+  await expect(page.getByRole("link", { name: /join the waitlist/i })).toBeVisible();
 });
 
 test("no horizontal scrollbar: scrollWidth equals clientWidth on <html>", async ({ page }) => {

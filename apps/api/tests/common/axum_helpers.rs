@@ -64,6 +64,24 @@ pub async fn post_empty(app: Router, uri: &str) -> axum::response::Response {
     app.oneshot(request).await.unwrap()
 }
 
+/// POST with an empty body and an `Authorization: Bearer ...` header.
+/// Used by handler tests that depend on `WorkosJwtClaims` (or any other
+/// extractor that reads the bearer token directly).
+pub async fn post_empty_with_auth(
+    app: Router,
+    uri: &str,
+    token: &str,
+) -> axum::response::Response {
+    let request = Request::builder()
+        .method("POST")
+        .uri(uri)
+        .header("Authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    app.oneshot(request).await.unwrap()
+}
+
 pub async fn get_request(app: Router, uri: &str) -> axum::response::Response {
     let request = Request::builder()
         .uri(uri)

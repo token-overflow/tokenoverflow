@@ -1,6 +1,11 @@
 #![allow(dead_code)]
 
+use diesel::prelude::*;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use tokenoverflow::api::types::{CreateAnswerRequest, CreateQuestionRequest, SearchRequest};
+use tokenoverflow::db::models::{NewUser, User};
+use tokenoverflow::db::{users, waitlist};
+use tokenoverflow::services::repository::{PgUserRepository, UserRepository};
 
 /// Builder for CreateQuestionRequest with sensible defaults
 pub struct QuestionRequestBuilder {
@@ -133,4 +138,55 @@ impl SearchRequestBuilder {
             limit: self.limit,
         }
     }
+}
+
+/// Seed an `api.users` row plus a matching approved `api.waitlist` row
+/// so the integration test request flows through `jwt_auth_layer` exactly
+/// the way prod handles a pre-approved returning applicant.
+pub async fn seed_user_with_approval(
+    conn: &mut AsyncPgConnection,
+    workos_id: &str,
+    github_id: i64,
+    github_username: &str,
+) -> User {
+    let repo = PgUserRepository;
+    let new_user = NewUser {
+        workos_id: workos_id.to_string(),
+        github_id: Some(github_id),
+        username: github_username.to_string(),
+    };
+    let user = repo
+        .create(conn, &new_user)
+        .await
+        .expect("seed_user_with_approval: user insert must succeed");
+
+    diesel::insert_into(waitlist::table)
+        .values((
+            waitlist::github_id.eq(github_id),
+            waitlist::github_username.eq(github_username),
+            waitlist::email.eq(format!("{}@example.test", github_username)),
+            waitlist::approved_at.eq(diesel::dsl::now),
+            waitlist::user_id.eq(user.id),
+        ))
+        .on_conflict(waitlist::github_id)
+        .do_update()
+        .set((
+            waitlist::approved_at.eq(diesel::dsl::now),
+            waitlist::user_id.eq(user.id),
+        ))
+        .execute(conn)
+        .await
+        .expect("seed_user_with_approval: waitlist insert must succeed");
+
+    user
+}
+
+/// Count `api.users` rows. Used by waitlist tests that assert the
+/// signup endpoint does NOT provision a user row.
+pub async fn count_users(conn: &mut AsyncPgConnection) -> i64 {
+    users::table
+        .count()
+        .get_result(conn)
+        .await
+        .expect("count_users: select must succeed")
 }

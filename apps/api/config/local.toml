@@ -7,7 +7,6 @@ base_url = "http://localhost:8080"
 request_timeout_secs = 30
 
 [auth]
-workos_client_id = "client_test"
 workos_api_url = "http://localhost:8080"
 jwks_url = "file://tests/assets/auth/test_jwks.json"
 jwks_cache_ttl_secs = 0
@@ -16,6 +15,7 @@ audiences = ["http://localhost:8080"]
 authkit_url = "https://intimate-figure-17.authkit.app"
 github_api_url = "https://api.github.com"
 github_client_id = "Ov23lifpB2PCzk8nmdni"
+require_waitlist_approval = true
 
 [database]
 host = "localhost"

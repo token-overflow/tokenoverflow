@@ -1,0 +1,71 @@
+---
+// Waitlist confirmation popup. Hidden by default; the bundled
+// `waitlist_popup.ts` script reads `?waitlist=` from the URL and reveals
+// the matching variant. After rendering the script strips the query
+// param via `history.replaceState` so a refresh does not re-trigger the
+// popup.
+//
+// All copy lives in the markup so the script never touches innerHTML
+// (Trusted Types compliance: only classList + textContent + history APIs).
+---
+
+<div
+  data-waitlist-popup
+  data-state="hidden"
+  role="status"
+  aria-live="polite"
+  class="fixed bottom-6 right-6 z-50 max-w-sm rounded-xl border border-neutral-200 bg-white p-5 shadow-[0_10px_40px_rgb(0_0_0/8%)] transition-opacity duration-200 motion-reduce:transition-none data-[state=hidden]:hidden data-[state=hidden]:opacity-0"
+>
+  <div class="flex items-start gap-3">
+    <span
+      data-waitlist-icon
+      aria-hidden="true"
+      class="i-ph-check-circle-bold text-2xl shrink-0 mt-0.5 hidden data-[state=success]:block data-[state=success]:text-emerald-500 data-[state=neutral]:block data-[state=neutral]:text-neutral-400 data-[state=error]:block data-[state=error]:text-red-500"
+    ></span>
+    <div class="flex-1">
+      <p data-waitlist-title class="font-semibold text-neutral-900 mb-1"></p>
+      <p data-waitlist-body class="text-sm leading-relaxed text-neutral-600"></p>
+    </div>
+    <button
+      type="button"
+      data-waitlist-close
+      aria-label="Dismiss waitlist message"
+      class="text-neutral-400 hover:text-neutral-900 transition-colors focus-ring shrink-0 cursor-pointer bg-transparent border-none p-1 -mr-1 -mt-1"
+    >
+      <!-- Icon lives on a child span: UnoCSS preset-icons uses
+           `background-color: currentColor` to fill the mask, and
+           `bg-transparent` on the button itself would wipe the fill. -->
+      <span class="i-ph-x-bold text-lg block" aria-hidden="true"></span>
+    </button>
+  </div>
+</div>
+
+<template data-waitlist-copy="success">
+  <span data-waitlist-copy-title>You're on the list!</span>
+  <span data-waitlist-copy-body
+    >Thanks for signing up. We'll email you as soon as access opens up.</span
+  >
+</template>
+<template data-waitlist-copy="oauth_denied">
+  <span data-waitlist-copy-title>No worries</span>
+  <span data-waitlist-copy-body>You can try signing up again whenever you like.</span>
+</template>
+<template data-waitlist-copy="oauth_failed">
+  <span data-waitlist-copy-title>Sign-in didn't go through</span>
+  <span data-waitlist-copy-body>Something went wrong while signing you in. Please try again.</span>
+</template>
+<template data-waitlist-copy="state_invalid">
+  <span data-waitlist-copy-title>Session expired</span>
+  <span data-waitlist-copy-body
+    >Your session expired or another tab completed sign-up. You may already be on the
+    list.</span
+  >
+</template>
+<template data-waitlist-copy="server_error">
+  <span data-waitlist-copy-title>Something went wrong</span>
+  <span data-waitlist-copy-body>Please try again later.</span>
+</template>
+
+<script>
+  import "../scripts/waitlist_popup";
+</script>

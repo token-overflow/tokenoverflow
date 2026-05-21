@@ -5,8 +5,12 @@ FROM oven/bun:1.3.13 AS builder
 WORKDIR /app
 
 # Workspace manifests + lockfile for deterministic resolution via bunfig.toml.
+# The sibling app's package.json is copied as a stub so bun's workspace
+# globber resolves every member the lockfile references; otherwise
+# --frozen-lockfile reads the absent member as drift and rejects the install.
 COPY package.json bun.lock bunfig.toml turbo.json ./
 COPY apps/landing ./apps/landing
+COPY apps/web/package.json ./apps/web/package.json
 COPY packages ./packages
 
 # Isolated-linker install per bunfig.toml.

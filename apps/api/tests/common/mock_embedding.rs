@@ -17,8 +17,9 @@ use tokenoverflow::services::{AuthService, TagResolver};
 
 use super::mock_repository::{
     FailingAnswerRepository, FailingQuestionRepository, FailingSearchRepository,
-    FailingTagRepository, FailingUserRepository, MockAnswerRepository, MockQuestionRepository,
-    MockSearchRepository, MockStore, MockTagRepository, MockUserRepository,
+    FailingTagRepository, FailingUserRepository, FailingWaitlistRepository, MockAnswerRepository,
+    MockQuestionRepository, MockSearchRepository, MockStore, MockTagRepository,
+    MockUserRepository, MockWaitlistRepository,
 };
 use super::noop_conn::NoopConn;
 
@@ -100,14 +101,13 @@ pub fn create_tag_resolver(store: &MockStore) -> TagResolver {
 }
 
 /// Create a test AuthConfig pointing to the test JWKS file.
-fn test_auth_config() -> AuthConfig {
+pub fn test_auth_config() -> AuthConfig {
     let jwks_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/assets/auth/test_jwks.json")
         .to_string_lossy()
         .to_string();
 
     AuthConfig::new(
-        "client_test".to_string(),
         "http://localhost:8080".to_string(),
         format!("file://{}", jwks_path),
         0,
@@ -153,6 +153,7 @@ pub fn create_failing_mock_app_state() -> AppState {
     let search = Arc::new(FailingSearchRepository);
     let tags = Arc::new(FailingTagRepository);
     let users = Arc::new(FailingUserRepository);
+    let waitlist = Arc::new(FailingWaitlistRepository);
     // Empty resolver for failing state -- no tags to resolve
     let tag_resolver = Arc::new(TagResolver::from_data(
         std::collections::HashMap::new(),
@@ -168,6 +169,7 @@ pub fn create_failing_mock_app_state() -> AppState {
         search,
         tags,
         users,
+        waitlist,
         tag_resolver,
         auth,
         auth_config,
@@ -184,6 +186,7 @@ pub fn create_failing_mock_app_state_with_pool(pool: tokenoverflow::db::DbPool) 
     let search = Arc::new(FailingSearchRepository);
     let tags = Arc::new(FailingTagRepository);
     let users = Arc::new(FailingUserRepository);
+    let waitlist = Arc::new(FailingWaitlistRepository);
     // Empty resolver for failing state -- no tags to resolve
     let tag_resolver = Arc::new(TagResolver::from_data(
         std::collections::HashMap::new(),
@@ -199,6 +202,7 @@ pub fn create_failing_mock_app_state_with_pool(pool: tokenoverflow::db::DbPool) 
         search,
         tags,
         users,
+        waitlist,
         tag_resolver,
         auth,
         auth_config,
@@ -219,6 +223,7 @@ pub fn create_mock_app_state_with_users(workos_ids: &[&str]) -> AppState {
     for id in workos_ids {
         users.seed_user(id);
     }
+    let waitlist = Arc::new(MockWaitlistRepository::new(store.clone()));
     let tag_resolver = Arc::new(create_tag_resolver(&store));
     let auth_config = test_auth_config();
     let auth = Arc::new(AuthService::new(auth_config.clone()));
@@ -230,6 +235,7 @@ pub fn create_mock_app_state_with_users(workos_ids: &[&str]) -> AppState {
         search,
         tags,
         users,
+        waitlist,
         tag_resolver,
         auth,
         auth_config,
@@ -252,6 +258,7 @@ pub fn create_mock_app_state_with_users_and_pool(
     for id in workos_ids {
         users.seed_user(id);
     }
+    let waitlist = Arc::new(MockWaitlistRepository::new(store.clone()));
     let tag_resolver = Arc::new(create_tag_resolver(&store));
     let auth_config = test_auth_config();
     let auth = Arc::new(AuthService::new(auth_config.clone()));
@@ -263,6 +270,7 @@ pub fn create_mock_app_state_with_users_and_pool(
         search,
         tags,
         users,
+        waitlist,
         tag_resolver,
         auth,
         auth_config,
@@ -276,9 +284,15 @@ pub fn create_app_state_with_store(store: &MockStore) -> AppState {
     create_app_state_with_store_and_pool(store, pool)
 }
 
-/// Create an AppState backed by the given MockStore and a real pool.
-pub fn create_app_state_with_store_and_pool(
+/// Create an AppState whose user repo has a pre-seeded GitHub identity
+/// for `workos_id`. Used by handler tests that need the GitHub fields
+/// populated (e.g. the waitlist handler). Backed by a real pool from the
+/// caller (e.g. testcontainers), since the handler calls `pool.get()`.
+pub fn create_app_state_with_github_user(
     store: &MockStore,
+    workos_id: &str,
+    github_id: i64,
+    username: &str,
     pool: tokenoverflow::db::DbPool,
 ) -> AppState {
     let embedding = Arc::new(MockEmbedding::new());
@@ -287,6 +301,8 @@ pub fn create_app_state_with_store_and_pool(
     let search = Arc::new(MockSearchRepository::new(store.clone()));
     let tags = Arc::new(MockTagRepository::new(store.clone()));
     let users = Arc::new(MockUserRepository::new());
+    users.seed_github_user(workos_id, github_id, username);
+    let waitlist = Arc::new(MockWaitlistRepository::new(store.clone()));
     let tag_resolver = Arc::new(create_tag_resolver(store));
     let auth_config = test_auth_config();
     let auth = Arc::new(AuthService::new(auth_config.clone()));
@@ -298,6 +314,76 @@ pub fn create_app_state_with_store_and_pool(
         search,
         tags,
         users,
+        waitlist,
+        tag_resolver,
+        auth,
+        auth_config,
+        "http://localhost:8080".to_string(),
+    )
+}
+
+/// Create an AppState with a pre-seeded GitHub user whose waitlist
+/// insert always fails. Used by handler tests that exercise the 5xx
+/// path. Backed by a caller-provided pool since the handler calls
+/// `pool.get()` before reaching the failing repository.
+pub fn create_failing_waitlist_app_state(
+    workos_id: &str,
+    github_id: i64,
+    username: &str,
+    pool: tokenoverflow::db::DbPool,
+) -> AppState {
+    let embedding = Arc::new(MockEmbedding::new());
+    let store = MockStore::with_seed_tags();
+    let questions = Arc::new(MockQuestionRepository::new(store.clone()));
+    let answers = Arc::new(MockAnswerRepository::new(store.clone()));
+    let search = Arc::new(MockSearchRepository::new(store.clone()));
+    let tags = Arc::new(MockTagRepository::new(store.clone()));
+    let users = Arc::new(MockUserRepository::new());
+    users.seed_github_user(workos_id, github_id, username);
+    let waitlist = Arc::new(FailingWaitlistRepository);
+    let tag_resolver = Arc::new(create_tag_resolver(&store));
+    let auth_config = test_auth_config();
+    let auth = Arc::new(AuthService::new(auth_config.clone()));
+    AppState::new(
+        pool,
+        embedding,
+        questions,
+        answers,
+        search,
+        tags,
+        users,
+        waitlist,
+        tag_resolver,
+        auth,
+        auth_config,
+        "http://localhost:8080".to_string(),
+    )
+}
+
+/// Create an AppState backed by the given MockStore and a real pool.
+pub fn create_app_state_with_store_and_pool(
+    store: &MockStore,
+    pool: tokenoverflow::db::DbPool,
+) -> AppState {
+    let embedding = Arc::new(MockEmbedding::new());
+    let questions = Arc::new(MockQuestionRepository::new(store.clone()));
+    let answers = Arc::new(MockAnswerRepository::new(store.clone()));
+    let search = Arc::new(MockSearchRepository::new(store.clone()));
+    let tags = Arc::new(MockTagRepository::new(store.clone()));
+    let users = Arc::new(MockUserRepository::new());
+    let waitlist = Arc::new(MockWaitlistRepository::new(store.clone()));
+    let tag_resolver = Arc::new(create_tag_resolver(store));
+    let auth_config = test_auth_config();
+    let auth = Arc::new(AuthService::new(auth_config.clone()));
+    AppState::new(
+        pool,
+        embedding,
+        questions,
+        answers,
+        search,
+        tags,
+        users,
+        waitlist,
         tag_resolver,
         auth,
         auth_config,

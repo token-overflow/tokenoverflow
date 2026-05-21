@@ -80,12 +80,12 @@ resource "aws_launch_template" "bastion" {
 }
 
 resource "aws_autoscaling_group" "bastion" {
-  name                 = "bastion"
-  min_size             = 1
-  max_size             = 1
-  desired_capacity     = 1
-  vpc_zone_identifier  = [var.subnet_id]
-  capacity_rebalance = true
+  name                = "bastion"
+  min_size            = 1
+  max_size            = 1
+  desired_capacity    = 1
+  vpc_zone_identifier = [var.subnet_id]
+  capacity_rebalance  = true
 
   mixed_instances_policy {
     instances_distribution {

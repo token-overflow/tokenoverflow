@@ -10,7 +10,8 @@ use tokenoverflow::api::routes::health::{HealthResponse, health_check};
 use tokenoverflow::api::state::AppState;
 use tokenoverflow::config::AuthConfig;
 use tokenoverflow::services::repository::{
-    PgAnswerRepository, PgQuestionRepository, PgSearchRepository, PgTagRepository, PgUserRepository,
+    PgAnswerRepository, PgQuestionRepository, PgSearchRepository, PgTagRepository,
+    PgUserRepository, PgWaitlistRepository,
 };
 use tokenoverflow::services::{AuthService, TagResolver};
 
@@ -37,7 +38,6 @@ fn test_auth_config() -> AuthConfig {
         .to_string();
 
     AuthConfig::new(
-        "client_test".to_string(),
         "http://localhost:8080".to_string(),
         format!("file://{}", jwks_path),
         0,
@@ -66,6 +66,7 @@ async fn health_check_with_real_database_returns_connected() {
     let auth_config = test_auth_config();
     let auth = Arc::new(AuthService::new(auth_config.clone()));
 
+    let waitlist = Arc::new(PgWaitlistRepository);
     let state = AppState::new(
         pool.clone(),
         Arc::new(StubEmbedding),
@@ -74,6 +75,7 @@ async fn health_check_with_real_database_returns_connected() {
         Arc::new(PgSearchRepository),
         tag_repo,
         users,
+        waitlist,
         tag_resolver,
         auth,
         auth_config,

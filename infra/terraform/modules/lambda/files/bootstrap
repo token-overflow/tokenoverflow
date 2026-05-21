@@ -1,0 +1,8 @@
+#!/bin/sh
+# Placeholder bootstrap shipped by Terraform on the first apply so the
+# `provided.al2023` runtime has an executable at the expected path before
+# CI replaces the function code with the real artifact. Any invocation
+# returns a hard error; this script is never expected to run in steady
+# state.
+echo '{"errorType":"NotDeployed","errorMessage":"Lambda placeholder; CI has not run yet"}' >&2
+exit 1

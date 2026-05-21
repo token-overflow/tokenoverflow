@@ -7,19 +7,23 @@ use crate::api::routes::health;
 use crate::api::routes::oauth_proxy;
 use crate::api::routes::questions;
 use crate::api::routes::search;
+use crate::api::routes::waitlist;
 use crate::api::routes::well_known;
 use crate::api::state::AppState;
 
 /// Configure all routes for the application.
 ///
 /// Public routes (no auth): /health, /.well-known/*, /oauth2/*
-/// Protected routes (jwt_auth middleware): /v1/*
+/// JWT-validated but un-gated: /v1/waitlist (sign-up requires accepting a
+///   token before the user has an `api.users` row).
+/// Protected routes (jwt_auth middleware): everything else under /v1/*
 ///
 // Declarative .route() wiring — no branching logic to test.
 // E2E: tests/e2e/api/routes/ exercises every route end-to-end.
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub fn configure(state: AppState) -> Router<AppState> {
-    // Protected routes require JWT authentication.
+    // Protected routes require JWT authentication AND the waitlist gate
+    // (when require_waitlist_approval is true).
     // State is passed to the middleware so it can validate JWTs and resolve users.
     let protected = Router::new()
         .route("/v1/search", post(search::search))
@@ -45,7 +49,8 @@ pub fn configure(state: AppState) -> Router<AppState> {
         )
         .route("/oauth2/authorize", get(oauth_proxy::authorize))
         .route("/oauth2/token", post(oauth_proxy::token))
-        .route("/oauth2/register", post(oauth_proxy::register));
+        .route("/oauth2/register", post(oauth_proxy::register))
+        .route("/v1/waitlist", post(waitlist::add_to_waitlist));
 
     public.merge(protected)
 }

@@ -13,7 +13,8 @@ use tokenoverflow::api::routes::oauth_proxy::{register, token};
 use tokenoverflow::api::state::AppState;
 use tokenoverflow::config::AuthConfig;
 use tokenoverflow::services::repository::{
-    PgAnswerRepository, PgQuestionRepository, PgSearchRepository, PgTagRepository, PgUserRepository,
+    PgAnswerRepository, PgQuestionRepository, PgSearchRepository, PgTagRepository,
+    PgUserRepository, PgWaitlistRepository,
 };
 use tokenoverflow::services::{AuthService, TagResolver};
 
@@ -40,7 +41,6 @@ fn auth_config_for_mock(mock_server_uri: &str) -> AuthConfig {
         .to_string();
 
     AuthConfig::new(
-        "client_test".to_string(),
         "http://localhost:8080".to_string(),
         format!("file://{}", jwks_path),
         0,
@@ -68,6 +68,7 @@ async fn build_state(db: &IntegrationTestDb, mock_server_uri: &str) -> AppState 
     let auth_config = auth_config_for_mock(mock_server_uri);
     let auth = Arc::new(AuthService::new(auth_config.clone()));
 
+    let waitlist = Arc::new(PgWaitlistRepository);
     AppState::new(
         pool.clone(),
         Arc::new(StubEmbedding),
@@ -76,6 +77,7 @@ async fn build_state(db: &IntegrationTestDb, mock_server_uri: &str) -> AppState 
         Arc::new(PgSearchRepository),
         tag_repo,
         users,
+        waitlist,
         tag_resolver,
         auth,
         auth_config,
@@ -150,6 +152,51 @@ async fn token_proxy_returns_502_when_authkit_unreachable() {
     let response = app.oneshot(request).await.unwrap();
 
     assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+}
+
+/// AuthKit returns a structured 4xx OAuth2 error. The proxy must forward it
+/// verbatim - the client already has something actionable to display, so
+/// synthesizing on top of it would only mask upstream signal.
+#[tokio::test]
+async fn token_proxy_passes_through_non_empty_error_body() {
+    let db = IntegrationTestDb::new().await;
+    let mock_server = MockServer::start().await;
+
+    let upstream_body = serde_json::json!({
+        "error": "invalid_grant",
+        "error_description": "Refresh token has been revoked",
+    });
+
+    Mock::given(method("POST"))
+        .and(path("/oauth2/token"))
+        .respond_with(
+            ResponseTemplate::new(400)
+                .set_body_json(upstream_body.clone())
+                .insert_header("content-type", "application/json"),
+        )
+        .expect(1)
+        .mount(&mock_server)
+        .await;
+
+    let state = build_state(&db, &mock_server.uri()).await;
+    let app: Router = Router::new()
+        .route("/oauth2/token", post(token))
+        .with_state(state);
+
+    let request = Request::builder()
+        .method("POST")
+        .uri("/oauth2/token")
+        .header("content-type", "application/x-www-form-urlencoded")
+        .body(Body::from("grant_type=refresh_token&refresh_token=rt"))
+        .unwrap();
+    let response = app.oneshot(request).await.unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).expect("valid JSON");
+    assert_eq!(json, upstream_body);
 }
 
 #[tokio::test]

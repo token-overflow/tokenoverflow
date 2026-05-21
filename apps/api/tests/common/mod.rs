@@ -26,30 +26,36 @@ pub mod test_jwt;
 // Re-exports for easy test imports
 #[allow(unused_imports)]
 pub use axum_helpers::{
-    fake_auth_layer, fake_voter_auth_layer, get_request, post_empty, post_json, read_json,
+    fake_auth_layer, fake_voter_auth_layer, get_request, post_empty, post_empty_with_auth,
+    post_json, read_json,
 };
 #[allow(unused_imports)]
-pub use fixtures::{AnswerRequestBuilder, QuestionRequestBuilder, SearchRequestBuilder};
+pub use fixtures::{
+    AnswerRequestBuilder, QuestionRequestBuilder, SearchRequestBuilder, count_users,
+    seed_user_with_approval,
+};
 #[allow(unused_imports)]
 pub use http_client::TestClient;
 #[allow(unused_imports)]
 pub use mock_embedding::{
-    create_app_state_with_store, create_app_state_with_store_and_pool,
-    create_failing_mock_app_state, create_failing_mock_app_state_with_pool,
-    create_mock_app_state, create_mock_app_state_with_pool,
-    create_mock_app_state_with_users, create_mock_app_state_with_users_and_pool,
-    create_mock_service_deps, create_tag_resolver, FailingMockEmbedding, MockEmbedding,
+    create_app_state_with_github_user, create_app_state_with_store,
+    create_app_state_with_store_and_pool, create_failing_mock_app_state,
+    create_failing_mock_app_state_with_pool, create_failing_waitlist_app_state,
+    create_mock_app_state, create_mock_app_state_with_pool, create_mock_app_state_with_users,
+    create_mock_app_state_with_users_and_pool, create_mock_service_deps, create_tag_resolver,
+    test_auth_config, FailingMockEmbedding, MockEmbedding,
 };
 #[allow(unused_imports)]
 pub use mock_repository::{
     FailingAnswerRepository, FailingQuestionRepository, FailingSearchRepository,
-    FailingTagRepository, FailingUserRepository, MockAnswerRepository, MockQuestionRepository,
-    MockSearchRepository, MockStore, MockTagRepository, MockUserRepository,
+    FailingTagRepository, FailingUserRepository, FailingWaitlistRepository, MockAnswerRepository,
+    MockQuestionRepository, MockSearchRepository, MockStore, MockTagRepository,
+    MockUserRepository, MockWaitlistRepository,
 };
 #[allow(unused_imports)]
 pub use noop_conn::NoopConn;
 #[allow(unused_imports)]
 pub use test_jwt::{
     generate_expired_test_jwt, generate_test_jwt, generate_test_jwt_custom,
-    generate_test_jwt_with_kid,
+    generate_test_jwt_with_kid, generate_test_jwt_without_email,
 };

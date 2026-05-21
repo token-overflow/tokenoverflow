@@ -7,7 +7,6 @@ base_url = "http://127.0.0.1:8080"
 request_timeout_secs = 30
 
 [auth]
-workos_client_id = "client_test"
 workos_api_url = "http://localhost:8080"
 jwks_url = "file://tests/assets/auth/test_jwks.json"
 jwks_cache_ttl_secs = 0

@@ -26,3 +26,11 @@ max_concurrency = 8
 timeout = 20
 retry_wait_time = 2
 max_retries = 2
+
+# Persist successful link results to `.lycheecache` so subsequent prek runs
+# only re-check links that have not been verified within `max_cache_age`.
+# `cache_exclude_status` skips caching ephemeral failures so we still notice
+# them on the next run.
+cache = true
+max_cache_age = "1d"
+cache_exclude_status = [429, 500, 502, 503, 504]

@@ -1,0 +1,18 @@
+{
+  "extends": "@tokenoverflow/tsconfig/base",
+  "compilerOptions": {
+    "rootDir": ".",
+    "types": ["node"],
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "moduleResolution": "bundler",
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"],
+  "exclude": [
+    "node_modules",
+    ".output",
+    ".nitro",
+    "src/utils/api/_generated/**"
+  ]
+}

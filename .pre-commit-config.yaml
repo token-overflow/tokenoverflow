@@ -133,7 +133,13 @@ repos:
         name: act (Deploy Landing)
         entry: act push -W .github/workflows/deploy_landing.yml -e .github/act/event_push_main.json --secret-file .act.secrets
         language: system
-        files: ^(\.github/workflows/deploy_landing\.yml|apps/landing/.*|packages/.*|bun\.lock)$
+        files: ^\.github/workflows/deploy_landing\.yml$
+        pass_filenames: false
+      - id: act-deploy-web
+        name: act (Deploy Web)
+        entry: act push -W .github/workflows/deploy_web.yml -e .github/act/event_push_main.json --secret-file .act.secrets
+        language: system
+        files: ^\.github/workflows/deploy_web\.yml$
         pass_filenames: false
 
       # LINKS

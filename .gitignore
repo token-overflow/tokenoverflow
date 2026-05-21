@@ -9,6 +9,14 @@ node_modules/
 .turbo/
 dist/
 
+# Nitro / TanStack Start build outputs
+.nitro/
+.output/
+
+# Generated TypeScript files.
+*.gen.ts
+apps/web/src/utils/api/_generated/
+
 # Astro
 .astro/
 
@@ -23,6 +31,9 @@ playwright/.cache/
 
 # Stylelint cache
 .stylelintcache
+
+# Lychee link-checker cache
+.lycheecache
 
 # IDE
 .idea/
@@ -40,6 +51,7 @@ Thumbs.db
 *.tfvars
 !*.tfvars.example
 .terragrunt-cache/
+infra/terraform/modules/*/.placeholder.zip
 
 # Docker volumes (local)
 postgres_data/

@@ -1,10 +1,11 @@
 locals {
   aws_region                  = "us-east-1"
-  env_vars = read_terragrunt_config(find_in_parent_folders("env.hcl"))
+  env_vars                    = read_terragrunt_config(find_in_parent_folders("env.hcl"))
   env_name                    = local.env_vars.locals.env_name
   backend_bucket              = local.env_vars.locals.backend_bucket
   aws_provider_version        = "6.35.1"
   cloudflare_provider_version = "5.18.0"
+  archive_provider_version    = "2.7.1"
 }
 
 remote_state {

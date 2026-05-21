@@ -4,8 +4,13 @@
   "globalEnv": ["TOKENOVERFLOW_ENV"],
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "dependsOn": ["^build", "gen:api-client"],
+      "outputs": ["dist/**", ".output/**"]
+    },
+    "gen:api-client": {
+      "outputs": ["src/utils/api/_generated/**"],
+      "cache": true,
+      "env": ["TOKENOVERFLOW_BUNDLED_LIBS"]
     },
     "dev": {
       "cache": false,

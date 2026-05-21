@@ -28,7 +28,6 @@ fn default_request_timeout_secs() -> u64 {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AuthConfig {
-    pub workos_client_id: String,
     pub workos_api_url: String,
     pub jwks_url: String,
     #[serde(default = "default_jwks_cache_ttl")]
@@ -44,6 +43,12 @@ pub struct AuthConfig {
     pub github_api_url: String,
     #[serde(default)]
     pub github_client_id: Option<String>,
+    /// When true, `resolve_user` only provisions an `api.users` row for
+    /// applicants whose `api.waitlist` row has `approved_at IS NOT NULL`.
+    /// Default true so local dev mirrors prod fidelity; flip to false to
+    /// retire the gate after rollout.
+    #[serde(default = "default_require_waitlist_approval")]
+    pub require_waitlist_approval: bool,
     #[serde(skip_deserializing)]
     workos_api_key: Option<String>,
     #[serde(skip_deserializing)]
@@ -52,6 +57,10 @@ pub struct AuthConfig {
 
 fn default_jwks_cache_ttl() -> u64 {
     3600
+}
+
+fn default_require_waitlist_approval() -> bool {
+    true
 }
 
 impl AuthConfig {
@@ -73,7 +82,6 @@ impl AuthConfig {
     /// Create an AuthConfig programmatically without TOML deserialization.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        workos_client_id: String,
         workos_api_url: String,
         jwks_url: String,
         jwks_cache_ttl_secs: u64,
@@ -83,7 +91,6 @@ impl AuthConfig {
         github_api_url: String,
     ) -> Self {
         Self {
-            workos_client_id,
             workos_api_url,
             jwks_url,
             jwks_cache_ttl_secs,
@@ -92,6 +99,7 @@ impl AuthConfig {
             authkit_url,
             github_api_url,
             github_client_id: None,
+            require_waitlist_approval: default_require_waitlist_approval(),
             workos_api_key: None,
             github_client_secret: None,
         }
@@ -108,6 +116,10 @@ impl AuthConfig {
     pub fn set_github_oauth_for_test(&mut self, client_id: String, client_secret: String) {
         self.github_client_id = Some(client_id);
         self.github_client_secret = Some(client_secret);
+    }
+
+    pub fn set_require_waitlist_approval_for_test(&mut self, value: bool) {
+        self.require_waitlist_approval = value;
     }
 }
 

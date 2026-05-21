@@ -1,8 +1,3 @@
-import type { AppConfig } from "../schema.js";
+import type { AppConfig, DeepPartial } from "../schema.js";
 
-export const localConfig = {
-  env: "local",
-  landing: {
-    base_url: "http://localhost:4321",
-  },
-} as const satisfies AppConfig;
+export const localOverrides: DeepPartial<AppConfig> = {};

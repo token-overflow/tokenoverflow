@@ -15,8 +15,8 @@ module "rds" {
   major_engine_version = "18"
 
   # Instance
-  instance_class               = var.instance_class
-  multi_az                     = var.multi_az
+  instance_class = var.instance_class
+  multi_az       = var.multi_az
 
   # Storage
   allocated_storage     = var.allocated_storage

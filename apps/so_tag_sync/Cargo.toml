@@ -42,10 +42,12 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # ORM for database operations
-diesel = { version = "2.2", features = ["postgres", "chrono", "uuid"] }
+# Pinned to 2.3+ to fix GHSA-h5x4-m2qf-r4f2 (SQLite UTF-8 corruption)
+diesel = { version = "2.3", features = ["postgres", "chrono", "uuid"] }
 
 # Async Diesel with bb8 connection pooling
-diesel-async = { version = "0.5", features = ["postgres", "bb8"] }
+# Pinned to 0.7+ for compatibility with diesel 2.3
+diesel-async = { version = "0.7", features = ["postgres", "bb8"] }
 
 # Chrono for timestamps
 chrono = { version = "0.4", features = ["serde"] }

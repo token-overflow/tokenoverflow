@@ -60,21 +60,24 @@ All authentication goes through **WorkOS AuthKit** (GitHub OAuth). AuthKit is
 the OAuth authorization server; User Management is the backend that stores
 users. They share the same user database.
 
-### Why two OAuth applications?
+### Why three OAuth applications?
 
 The OAuth spec requires a client to be either **confidential** (has a secret)
 or **public** (uses PKCE). A server-side web app can safely store a secret; a
-distributed CLI plugin cannot. So we register one app for each:
+distributed CLI plugin cannot. We register one app per surface so each runtime
+has its own credentials:
 
-| Client type  | App name          | Client ID                           | Secret?   | Used by            |
-| ------------ | ----------------- | ----------------------------------- | --------- | ------------------ |
-| Confidential  | TokenOverflow API  | `client_01KN38Y925JA8QF8RC44683JY4` | Yes       | Bruno, SSR web app |
-| Public       | TokenOverflow MCP  | `client_01KN3MGDJEZSGSXWH8YKKDCB2T` | No (PKCE) | Claude Code        |
+| Client type  | App name           | Client ID                           | Secret?   | Used by      |
+| ------------ | ------------------ | ----------------------------------- | --------- | ------------ |
+| Confidential | TokenOverflow Bruno | `client_01KN38Y925JA8QF8RC44683JY4` | Yes       | Bruno only   |
+| Confidential | TokenOverflow Web   | `client_01KQZW2FG777B71ZK5WG9EKPTW` | Yes       | BFF (`apps/web`) |
+| Public       | TokenOverflow MCP   | `client_01KN3MGDJEZSGSXWH8YKKDCB2T` | No (PKCE) | Claude Code  |
 
-Both apps produce access tokens with the same issuer and audience. WorkOS sets
-the access token `aud` to the environment-level client ID
-(`client_01KKZDZQ26HJSBXSWQRSWABFMX`), regardless of which app initiated the
-flow. The per-app client ID only appears in ID tokens (not used for API auth).
+All three apps produce access tokens with the same issuer and audience. WorkOS
+sets the access token `aud` to the environment-level client ID
+(`client_01KKZDZQ26HJSBXSWQRSWABFMX`), regardless of which of the three apps
+initiated the flow. The per-app client ID only appears in ID tokens (not used
+for API auth).
 
 ### Why ship `oauth.clientId` in the plugin?
 
@@ -92,8 +95,8 @@ where it sends empty or missing `scope` in OAuth authorization requests.
 WorkOS rejects these with `invalid_scope`. To work around this, our API acts
 as an OAuth authorization proxy.
 
-Confidential clients (Bruno, web app) are **not affected** by the proxy. They
-talk to AuthKit directly and send scopes correctly.
+Confidential clients (Bruno, BFF web app) are **not affected** by the proxy.
+They talk to AuthKit directly and send scopes correctly.
 
 Once the Claude Code bug is fixed, the proxy can be removed by pointing
 `authorization_servers` directly to the AuthKit URL.
@@ -227,11 +230,12 @@ sequenceDiagram
 
 ### Confidential client flow
 
-1. Configure your tool (Bruno, SSR web app) with AuthKit endpoints:
+1. Configure your tool (Bruno or the BFF) with AuthKit endpoints:
    Authorization URL: `https://intimate-figure-17.authkit.app/oauth2/authorize`
    Token URL:         `https://intimate-figure-17.authkit.app/oauth2/token`
-   Client ID:         `client_01KN38Y925JA8QF8RC44683JY4`
-   Client Secret:     (from WorkOS dashboard)
+   Client ID:         `client_01KN38Y925JA8QF8RC44683JY4` (TokenOverflow Bruno)
+                      `client_01KQZW2FG777B71ZK5WG9EKPTW` (TokenOverflow Web)
+   Client Secret:     (from WorkOS dashboard, per app)
    Scopes:            `openid profile`
 
 2. User clicks "Login" -> AuthKit -> GitHub OAuth -> JWT issued

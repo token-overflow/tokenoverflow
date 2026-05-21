@@ -1,0 +1,79 @@
+name: Deploy Web
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "apps/web/**"
+      - "packages/**"
+      - "bun.lock"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  WEB_BUCKET: tokenoverflow-lambda-prod
+  WEB_LAMBDA_NAME: web
+  TOKENOVERFLOW_ENV: production
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-slim
+    environment: prod
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2.2.0
+        with:
+          bun-version: 1.3.13
+
+      - name: Install Rust toolchain
+        # The web build's `gen:api-client` step shells out to
+        # `cargo run --openapi-json` to derive the typed BFF -> API
+        # client. Pin the same action used by deploy_api.yml so the
+        # toolchain version is consistent across CI runs.
+        uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9  # stable
+        with:
+          toolchain: stable
+
+      - name: Configure AWS credentials
+        if: ${{ !github.event.act }}
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7  # v6.0.0
+        with:
+          role-to-assume: ${{ secrets.AWS_IAM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build BFF
+        # Statically bundle libpq + OpenSSL for `gen:api-client`'s cargo build since ubuntu-slim does not ship them.
+        env:
+          TOKENOVERFLOW_BUNDLED_LIBS: "1"
+        run: bun run build:web
+
+      - name: Package zip
+        run: |
+          mkdir -p dist
+          cd apps/web/.output/server && zip -r ../../../../dist/web.zip .
+
+      - name: Upload to S3 and update Lambda
+        if: ${{ !github.event.act }}
+        run: |
+          SHA=$(shasum -a 256 dist/web.zip | cut -c1-12)
+          aws s3 cp dist/web.zip "s3://${WEB_BUCKET}/web/${SHA}.zip"
+          aws lambda update-function-code \
+            --function-name "${WEB_LAMBDA_NAME}" \
+            --s3-bucket "${WEB_BUCKET}" \
+            --s3-key "web/${SHA}.zip" \
+            --region "$AWS_REGION"

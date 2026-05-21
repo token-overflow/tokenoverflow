@@ -11,14 +11,32 @@ use tracing::{info, warn};
 use crate::config::AuthConfig;
 use crate::db::models::{NewUser, User};
 use crate::error::AppError;
-use crate::services::repository::UserRepository;
+use crate::services::repository::{UserRepository, WaitlistRepository};
 
 /// Validated JWT claims extracted from the token.
-#[derive(Debug, Deserialize)]
+///
+/// `email` is required: AuthKit access tokens carry it via the JWT
+/// Template configured in the WorkOS Dashboard (Authentication →
+/// Features → JWT Template), which injects `{"email": "{{ user.email }}"}`
+/// into every access token.
+#[derive(Debug)]
 pub struct JwtClaims {
     pub sub: String,
     pub iss: String,
     pub aud: StringOrVec,
+    pub email: String,
+}
+
+/// Wire-level claims as parsed by `jsonwebtoken::decode`. `email` is
+/// optional here so we can produce a precise "missing email claim"
+/// error instead of a generic deserialization failure.
+#[derive(Debug, Deserialize)]
+struct RawJwtClaims {
+    sub: String,
+    iss: String,
+    aud: StringOrVec,
+    #[serde(default)]
+    email: Option<String>,
 }
 
 /// WorkOS returns `aud` as either a string or array; handle both.
@@ -125,11 +143,17 @@ impl AuthService {
 
     /// Resolve the local user from the JWT sub claim.
     ///
-    /// Looks up by workos_id. If not found, calls WorkOS and GitHub APIs for
-    /// JIT provisioning.
+    /// Branches:
+    /// 1. `api.users` row exists → return it.
+    /// 2. Else if `require_waitlist_approval` is false → JIT-provision
+    ///    via the WorkOS-backed identity helper.
+    /// 3. Else → look up `api.waitlist` by GitHub id and branch on
+    ///    `approved_at`: approved provisions a user, pending returns
+    ///    `WaitlistPending`, missing returns `WaitlistRequired`.
     pub async fn resolve_user<Conn: Send>(
         &self,
         user_repo: &(dyn UserRepository<Conn> + Sync),
+        waitlist_repo: &(dyn WaitlistRepository<Conn> + Sync),
         conn: &mut Conn,
         workos_id: &str,
     ) -> Result<User, AppError> {
@@ -138,9 +162,60 @@ impl AuthService {
             return Ok(user);
         }
 
-        // Slow path: first login, fetch profile from WorkOS and create user
-        let new_user = self.fetch_workos_profile(workos_id).await?;
-        user_repo.create(conn, &new_user).await
+        let (github_id, github_login) = self
+            .resolve_github_identity(user_repo, conn, workos_id)
+            .await?;
+
+        // Rollout-deprecation: when the gate is off, revert to plain
+        // find-or-create.
+        if !self.config.require_waitlist_approval {
+            let new_user = NewUser {
+                workos_id: workos_id.to_string(),
+                github_id: Some(github_id),
+                username: github_login,
+            };
+            return user_repo.create(conn, &new_user).await;
+        }
+
+        // Gate ON: applicant must have an approved waitlist row.
+        match waitlist_repo.find_by_github_id(conn, github_id).await? {
+            Some(entry) if entry.approved_at.is_some() => {
+                let new_user = NewUser {
+                    workos_id: workos_id.to_string(),
+                    github_id: Some(github_id),
+                    username: github_login,
+                };
+                let user = user_repo.create(conn, &new_user).await?;
+                // Best-effort audit: the user creation is the source of
+                // truth, so a `set_user_id` failure does not roll back the
+                // user. We still surface it as Internal so the operator
+                // notices a partial state.
+                waitlist_repo.set_user_id(conn, github_id, user.id).await?;
+                Ok(user)
+            }
+            Some(_) => Err(AppError::WaitlistPending),
+            None => Err(AppError::WaitlistRequired),
+        }
+    }
+
+    /// Map a `workos_id` to `(github_id, github_login)`.
+    ///
+    /// Tries the local `api.users` row first so any returning prod user
+    /// skips the WorkOS round-trip. Falls through to the WorkOS Management
+    /// API for callers without a db entry.
+    pub async fn resolve_github_identity<Conn: Send>(
+        &self,
+        user_repo: &(dyn UserRepository<Conn> + Sync),
+        conn: &mut Conn,
+        workos_id: &str,
+    ) -> Result<(i64, String), AppError> {
+        if let Some(user) = user_repo.find_by_workos_id(conn, workos_id).await?
+            && let Some(github_id) = user.github_id
+        {
+            return Ok((github_id, user.username));
+        }
+
+        self.resolve_github_identity_via_workos(workos_id).await
     }
 
     /// Try to validate the JWT against the cached JWKS for the given kid.
@@ -181,10 +256,20 @@ impl AuthService {
         validation.set_audience(&aud_refs);
         validation.set_required_spec_claims(&["sub", "iss", "aud", "exp"]);
 
-        let token_data: TokenData<JwtClaims> = decode(token, &decoding_key, &validation)
+        let token_data: TokenData<RawJwtClaims> = decode(token, &decoding_key, &validation)
             .map_err(|e| AppError::Unauthorized(format!("JWT validation failed: {}", e)))?;
 
-        Ok(Some(token_data.claims))
+        let raw = token_data.claims;
+        let email = raw
+            .email
+            .ok_or_else(|| AppError::Unauthorized("missing email claim".to_string()))?;
+
+        Ok(Some(JwtClaims {
+            sub: raw.sub,
+            iss: raw.iss,
+            aud: raw.aud,
+            email,
+        }))
     }
 
     /// Get JWKS keys, loading from source if cache is empty or expired.
@@ -242,21 +327,26 @@ impl AuthService {
         }
     }
 
-    /// Fetch GitHub identity and username for JIT provisioning.
+    /// Fetch GitHub identity and username via the WorkOS Management API.
     ///
     /// The user is already authenticated via JWT (WorkOS verified them),
     /// so we skip fetching the WorkOS user profile and go straight to:
     /// 1. Fetch WorkOS identities to get the GitHub numeric user ID.
     /// 2. Fetch GitHub user profile to get the actual login handle.
-    async fn fetch_workos_profile(&self, workos_id: &str) -> Result<NewUser, AppError> {
+    async fn resolve_github_identity_via_workos(
+        &self,
+        workos_id: &str,
+    ) -> Result<(i64, String), AppError> {
         let api_key = self.config.workos_api_key().ok_or_else(|| {
             AppError::Internal(
-                "TOKENOVERFLOW_WORKOS_API_KEY not configured; cannot provision new user"
+                "TOKENOVERFLOW_WORKOS_API_KEY not configured; cannot resolve GitHub identity"
                     .to_string(),
             )
         })?;
 
         // Step 1: Fetch WorkOS identities to get GitHub numeric user ID
+        // workos_id is a ULID (Crockford base32, URL-safe by construction);
+        // no urlencoding needed.
         let identities_url = format!(
             "{}/user_management/users/{}/identities",
             self.config.workos_api_url, workos_id
@@ -330,11 +420,7 @@ impl AuthService {
             AppError::Internal(format!("Failed to parse GitHub user response: {}", e))
         })?;
 
-        Ok(NewUser {
-            workos_id: workos_id.to_string(),
-            github_id: Some(github_id),
-            username: github_user.login,
-        })
+        Ok((github_id, github_user.login))
     }
 }
 
