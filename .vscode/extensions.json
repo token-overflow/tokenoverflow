@@ -10,6 +10,10 @@
     "astro-build.astro-vscode",
     "hashicorp.hcl",
     "oxc.oxc-vscode",
-    "bradlc.vscode-tailwindcss"
+    "bradlc.vscode-tailwindcss",
+    "eamodio.gitlens",
+    "htmlhint.vscode-htmlhint",
+    "stylelint.vscode-stylelint",
+    "redhat.vscode-yaml"
   ]
 }

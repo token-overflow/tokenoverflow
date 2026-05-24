@@ -4,8 +4,10 @@
 /// JSON lines synchronously to `process.stdout` from the main thread (no
 /// worker, no async buffering); CloudWatch's native `@requestid` /
 /// `@timestamp` parsers can correlate lines without a custom log query.
-/// In `TOKENOVERFLOW_ENV=local` the logger swaps in `pino-pretty` so
-/// `vite dev` and docker-compose runs render human-readable output.
+/// In `TOKENOVERFLOW_ENV=local` the logger prefers `pino-pretty` so
+/// `vite dev` renders human-readable output; the bundled docker image
+/// drops the optional dep at build time, so the same code path falls
+/// back to plain JSON on `process.stdout` inside the container.
 ///
 /// The level is emitted as a string (`"info"`, `"warn"`, `"error"`) and
 /// the timestamp as ISO-8601 in UTC, matching the existing CloudWatch
@@ -17,13 +19,29 @@
 /// substrings inside a string, so callers MUST pass secrets as separate
 /// fields rather than interpolating them into the log message.
 
-import pino from "pino";
+import { createRequire } from "node:module";
+
+import pino, { type DestinationStream } from "pino";
 import { lambdaRequestTracker, PinoLogFormatter, pinoLambdaDestination } from "pino-lambda";
 
 const isLocal = process.env["TOKENOVERFLOW_ENV"] === "local";
 
+/// Pino-pretty is a devDependency that is intentionally NOT copied into
+/// the production container's runtime stage. The probe is intentionally
+/// non-static (string variable, not a literal) so Vite/Rolldown does
+/// not pull pino-pretty into the bundle.
+function buildLocalDestination(): DestinationStream | undefined {
+  const target = "pino-pretty";
+  try {
+    createRequire(import.meta.url).resolve(target);
+  } catch {
+    return undefined;
+  }
+  return pino.transport({ target, options: { colorize: true } });
+}
+
 const destination = isLocal
-  ? pino.transport({ target: "pino-pretty", options: { colorize: true } })
+  ? buildLocalDestination()
   : pinoLambdaDestination({ formatter: new PinoLogFormatter() });
 
 export const logger = pino(

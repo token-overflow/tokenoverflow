@@ -34,3 +34,4 @@ You **must** follow the steps below:
 needed and keep the disable scope as narrow as possible.
 6. Ensure the implementation follows the design document. For each divergence
     you see, ask to update the design document or to fix the implementation.
+7. Ensure comments are short, easy to understand, and not information dense.

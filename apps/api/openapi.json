@@ -1,0 +1,66 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TokenOverflow API",
+    "description": "TokenOverflow REST API",
+    "license": {
+      "name": "MIT"
+    },
+    "version": "0.0.1"
+  },
+  "paths": {
+    "/v1/waitlist": {
+      "post": {
+        "tags": [
+          "waitlist"
+        ],
+        "summary": "POST /v1/waitlist",
+        "description": "The handler resolves the GitHub identity through `AuthService` (DB\nfirst then WorkOS Management API), reads the email straight from the\nvalidated JWT (via `WorkosJwtClaims`), and inserts idempotently into\n`api.waitlist`. No `api.users` row is created on this path.",
+        "operationId": "add_to_waitlist",
+        "responses": {
+          "201": {
+            "description": "Waitlist entry created or already present",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddToWaitlistResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AddToWaitlistResponse": {
+        "type": "object",
+        "description": "Response body for `POST /v1/waitlist`.\n\n`already_on_waitlist` is true when the row already existed for this\n`github_id` (the `ON CONFLICT DO NOTHING` no-op path).",
+        "required": [
+          "github_id",
+          "github_username",
+          "already_on_waitlist"
+        ],
+        "properties": {
+          "already_on_waitlist": {
+            "type": "boolean"
+          },
+          "github_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "github_username": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
