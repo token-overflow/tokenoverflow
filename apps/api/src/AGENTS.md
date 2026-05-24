@@ -241,3 +241,25 @@ sequenceDiagram
 2. User clicks "Login" -> AuthKit -> GitHub OAuth -> JWT issued
 3. Tool sends JWT as `Authorization: Bearer <token>` on every request
 4. Gateway validates JWT (defense-in-depth), Axum validates again
+
+## Spec sync
+
+`apps/api/openapi.json` is the committed OpenAPI 3.1 spec derived from the
+`utoipa` annotations on the handlers. It is the source-of-truth artifact
+the web app's hey-api codegen reads, so the file stays under version
+control.
+
+The `check-openapi-spec-drift` pre-commit hook regenerates the spec and
+fails on diff whenever `apps/api/**/*.rs` or `Cargo.{toml,lock}` change,
+so commits that touch the API surface land the refreshed JSON together
+with the Rust change.
+
+To regenerate manually:
+
+```bash
+source scripts/src/includes.sh && gen_api_spec
+```
+
+That writes to `apps/api/openapi.json` by default. The function lives in
+`scripts/src/api.sh` and shells out to
+`cargo run --release --manifest-path apps/api/Cargo.toml -- --openapi-json`.

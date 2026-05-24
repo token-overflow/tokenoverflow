@@ -69,7 +69,7 @@ You **must** follow these guidelines at all times:
         - No duplication
         - Readable over clever
         - Comments only when necessary. Explain the why not the what. Make sure it's easy to
-        understand for people with no context, don't make it too information dense.
+        understand for people with no context, don't make it too information dense, keep it short.
         - Clear separation of concerns
 
 ## Validation

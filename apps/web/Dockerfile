@@ -13,6 +13,10 @@ COPY apps/web ./apps/web
 COPY apps/landing/package.json ./apps/landing/package.json
 COPY packages ./packages
 
+# The committed OpenAPI spec is the only API artifact the web build needs.
+# turbo's `gen:api-client` runs hey-api against it without a Rust toolchain.
+COPY apps/api/openapi.json ./apps/api/openapi.json
+
 # Isolated-linker install per bunfig.toml.
 RUN bun install --frozen-lockfile
 
@@ -20,7 +24,9 @@ RUN bun install --frozen-lockfile
 # runtime contract matches the prod aws_lambda preset; the only difference is
 # how the request loop is driven.
 ENV NITRO_PRESET=node-server
-RUN bun --filter @tokenoverflow/web build
+# `bun run build:web` routes through turbo so `gen:api-client` runs before
+# the vite build; that ordering is what plugs the generated SDK in.
+RUN bun run build:web
 
 # =============================================================================
 # Stage 2: Runtime - Node 22 runs the prebuilt server bundle

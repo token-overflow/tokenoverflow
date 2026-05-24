@@ -10,6 +10,7 @@ use utoipa::OpenApi;
         title = "TokenOverflow API",
         version = "0.0.1",
         description = "TokenOverflow REST API",
+        license(name = "MIT"),
     )
 )]
 pub struct ApiDoc;

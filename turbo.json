@@ -8,9 +8,12 @@
       "outputs": ["dist/**", ".output/**"]
     },
     "gen:api-client": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/api/openapi.json"
+      ],
       "outputs": ["src/utils/api/_generated/**"],
-      "cache": true,
-      "env": ["TOKENOVERFLOW_BUNDLED_LIBS"]
+      "cache": true
     },
     "dev": {
       "cache": false,

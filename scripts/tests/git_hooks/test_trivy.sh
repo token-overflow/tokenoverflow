@@ -13,6 +13,10 @@ set_up() {
   TEST_DIR=$(mktemp -d)
   ORIG_DIR="$(pwd)"
   ORIG_PATH="$PATH"
+  # Pre-commit invokes hooks with GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE set
+  # at the parent repo; if we leave them set, `git config` and `git add`
+  # below would write to the parent repo instead of this sandbox.
+  unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
   cd "$TEST_DIR" || exit 1
   git init -q
   git config user.email "test@example.com"

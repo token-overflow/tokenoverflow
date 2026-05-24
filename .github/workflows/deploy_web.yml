@@ -7,6 +7,7 @@ on:
       - "apps/web/**"
       - "packages/**"
       - "bun.lock"
+      - "apps/api/openapi.json"
   workflow_dispatch:
 
 concurrency:
@@ -37,15 +38,6 @@ jobs:
         with:
           bun-version: 1.3.13
 
-      - name: Install Rust toolchain
-        # The web build's `gen:api-client` step shells out to
-        # `cargo run --openapi-json` to derive the typed BFF -> API
-        # client. Pin the same action used by deploy_api.yml so the
-        # toolchain version is consistent across CI runs.
-        uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9  # stable
-        with:
-          toolchain: stable
-
       - name: Configure AWS credentials
         if: ${{ !github.event.act }}
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7  # v6.0.0
@@ -57,9 +49,6 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build BFF
-        # Statically bundle libpq + OpenSSL for `gen:api-client`'s cargo build since ubuntu-slim does not ship them.
-        env:
-          TOKENOVERFLOW_BUNDLED_LIBS: "1"
         run: bun run build:web
 
       - name: Package zip

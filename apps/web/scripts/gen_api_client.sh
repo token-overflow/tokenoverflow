@@ -1,29 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Generate the OpenAPI spec from the Rust API binary, then emit a typed
-# TypeScript SDK into src/utils/api/_generated/. The whole directory is
-# treated as generated output: hey-api wipes it on every run, and the
-# `*.gen.ts` glob in `.gitignore` keeps the tree out of version control.
-# The hand-written wrapper lives at src/utils/api/waitlist.server.ts and
-# imports `addToWaitlist` from `_generated/sdk.gen`.
+# Read the committed OpenAPI spec at apps/api/openapi.json and emit a typed
+# TypeScript SDK into src/utils/api/_generated/. The spec itself is produced
+# by the Rust API binary (`--openapi-json`) and refreshed by the
+# `check-openapi-spec-drift` pre-commit hook, so no cargo is needed here.
+# The whole _generated/ directory is treated as generated output: hey-api
+# wipes it on every run, and the `*.gen.ts` glob in `.gitignore` keeps the
+# tree out of version control. The hand-written wrapper lives at
+# src/utils/api/waitlist.server.ts and imports `addToWaitlist` from
+# `_generated/sdk.gen`. The hey-api version is governed by the workspace
+# devDependency pin in apps/web/package.json; no --version flag needed.
 
 cd "$(dirname "$0")/../../.."
 
-SPEC_FILE="$(mktemp -t openapi-spec.XXXXXX.json)"
-trap 'rm -f "$SPEC_FILE"' EXIT
-
-# Set `TOKENOVERFLOW_BUNDLED_LIBS=1` on runners without system libpq / OpenSSL to statically bundle them from C source.
-CARGO_ARGS=(--quiet --release --manifest-path apps/api/Cargo.toml)
-if [[ "${TOKENOVERFLOW_BUNDLED_LIBS:-}" == "1" ]]; then
-  CARGO_ARGS+=(--features bundled-libs)
+SPEC_FILE="apps/api/openapi.json"
+if [[ ! -f "$SPEC_FILE" ]]; then
+  echo "Missing ${SPEC_FILE}. Regenerate it:" >&2
+  echo "  source scripts/src/includes.sh && gen_api_spec" >&2
+  exit 1
 fi
-
-cargo run "${CARGO_ARGS[@]}" -- --openapi-json > "$SPEC_FILE"
 
 cd apps/web
 bun x @hey-api/openapi-ts \
-  --input "$SPEC_FILE" \
+  --input "../../${SPEC_FILE}" \
   --output src/utils/api/_generated
 
 # hey-api emits TypeScript that does not satisfy our `strict` +

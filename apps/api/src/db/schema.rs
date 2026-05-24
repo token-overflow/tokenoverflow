@@ -146,5 +146,14 @@ pub mod api {
     diesel::joinable!(waitlist -> users (user_id));
 
     diesel::allow_tables_to_appear_in_same_query!(
-        answers,api_keys,question_tags,questions,tag_synonyms,tags,users,votes,waitlist,);
+        answers,
+        api_keys,
+        question_tags,
+        questions,
+        tag_synonyms,
+        tags,
+        users,
+        votes,
+        waitlist,
+    );
 }
