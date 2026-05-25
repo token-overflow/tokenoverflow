@@ -1,0 +1,40 @@
+name: Playwright Install
+description: >-
+  Restore the Playwright browser cache for the given app, installing browsers
+  + OS deps only on a cache miss.
+
+inputs:
+  app:
+    description: Workspace name suffix (`landing` or `web`).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Validate app input
+      shell: bash
+      env:
+        INPUT_APP: ${{ inputs.app }}
+      run: |
+        case "${INPUT_APP}" in
+          landing|web) ;;
+          *) echo "Invalid app: ${INPUT_APP}" >&2; exit 1 ;;
+        esac
+
+    # Browser binaries are pinned by Playwright's version in bun.lock.
+    - name: Restore Playwright browser cache
+      id: cache
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ inputs.app }}-${{ hashFiles('bun.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-playwright-${{ inputs.app }}-
+
+    # `--with-deps` is the supported way to install OS packages Playwright needs.
+    - name: Install Playwright browsers
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        INPUT_APP: ${{ inputs.app }}
+      run: bunx "--filter=@tokenoverflow/${INPUT_APP}" playwright install --with-deps

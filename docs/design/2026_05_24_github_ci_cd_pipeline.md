@@ -34,7 +34,9 @@ fast local feedback checks.
 - Add a reusable LHCI workflow for the landing app.
 - Align Compose profiles to e2e legs and reuse the existing `redeploy_local`
   helper to boot the full stack.
-- Upload Playwright reports, JUnit XML, and Compose logs as e2e artifacts.
+- Upload Playwright reports and JUnit XML as e2e artifacts. On e2e failure,
+  also dump container logs to stdout and upload them as an artifact with
+  3-day retention.
 - Remove the `turbo-test-e2e` pre-commit hook.
 - Update pre-commit coverage so it skips the e2e binary.
 - Keep all other pre-commit hooks, including unit and integration tests.
@@ -586,6 +588,42 @@ fast local feedback checks.
 - Cons: E2E pull contract breaks when a needed `:sha` does not exist.
 - Rationale: Rejected.
 
+### How are e2e Docker logs captured?
+
+#### ✅ Option 1: step-security/gh-docker-logs on failure, stdout + 3-day artifact
+
+- Description: `e2e_test.yml` calls
+  `step-security/gh-docker-logs` with `if: failure()`. The action dumps every
+  container's logs to stdout (visible inline in the failed job UI) and to a
+  per-leg `docker-logs-<app>` artifact uploaded with `retention-days: 3`.
+- Pros: Off-the-shelf, security-hardened fork of `jwalton/gh-docker-logs`;
+  no log noise or artifact bloat on green runs; stdout gives instant
+  in-browser visibility; 3-day retention keeps artifact storage bounded
+  while leaving enough time to triage a failed PR.
+- Cons: Flaky tests that pass on retry leave no captured logs.
+- Rationale: Matches the dominant monorepo CI pattern (caller-side capture
+  via well-known action) and aligns with the project's existing reliance on
+  pinned third-party actions.
+
+#### ❌ Option 2: Custom `docker_logs` composite uploaded `if: always()`
+
+- Description: Hand-roll a sibling composite mirroring gh-docker-logs and
+  upload on every run.
+- Pros: One less third-party dependency.
+- Cons: Reinvents an existing maintained action; artifact bloat on green
+  runs (90-day default retention multiplied by every PR).
+- Rationale: Rejected.
+
+#### ❌ Option 3: `docker_compose_up` post-step uploads `compose.log` always
+
+- Description: Original v0 intent (and the wording on the `docker_compose_up`
+  interface bullet, since corrected).
+- Pros: Single touchpoint.
+- Cons: Composite actions cannot register true post-steps. An inline capture
+  inside the composite would run before the caller's tests, missing every
+  log line that matters for e2e debugging.
+- Rationale: Rejected (technically infeasible).
+
 ## Architecture Overview
 
 ```
@@ -657,6 +695,7 @@ SHA and comment in lockstep.
 | Path-filter change detection | `dorny/paths-filter`          | Re-use SHA (`v3.0.2`).                                    |
 | Playwright browsers install  | `bunx playwright install`     | Playwright's own CLI. No marketplace action.              |
 | Artifact upload              | `actions/upload-artifact`     | Latest `v4` SHA.                                          |
+| Docker log capture           | `step-security/gh-docker-logs` | Latest `v2` SHA. Failure-only, stdout + artifact.        |
 | Trivy filesystem scan        | `aquasecurity/trivy-action`   | Latest `v0` SHA.                                          |
 | Lighthouse CI                | `bun run test:lhci`           | Uses `@lhci/cli` (devDependency).                         |
 | Markdown lint                | `bunx markdownlint-cli`       | Same binary as the pre-commit hook.                       |
@@ -727,7 +766,10 @@ apps/landing/playwright.config.ts    # modified: retries: 1
 - **`docker_compose_up`** (inputs: `profile`, `tag`): logs in to GHCR, exports
   `TOKENOVERFLOW_IMAGE_TAG`/`TOKENOVERFLOW_IMAGE_REPO`, runs
   `docker compose --profile <profile> pull --policy always` then
-  `up -d --no-build --wait --wait-timeout 600`. Post-step uploads `compose.log`.
+  `up -d --no-build --wait --wait-timeout 600`. Logs are captured by the
+  caller via `step-security/gh-docker-logs` on failure (composite actions
+  cannot register true post-steps; see Key Decision "How are e2e Docker
+  logs captured?").
 - **`playwright_install`** (inputs: `app` = `landing` | `web`): restores
   Playwright browser cache keyed on `bun.lock`, runs
   `bunx --filter=@tokenoverflow/<app> playwright install --with-deps` on miss.
@@ -792,8 +834,10 @@ corresponding profile, then runs:
 - `landing`: `bun run --filter=@tokenoverflow/landing test:e2e`.
 - `web`: `bun run --filter=@tokenoverflow/web test:e2e`.
 
-Artifacts: `apps/<app>/playwright-report/**`, `apps/<app>/test-results/**`,
-`compose.log` (always).
+Artifacts (always): `apps/<app>/playwright-report/**`,
+`apps/<app>/test-results/**`. On failure only, an additional
+`docker-logs-<app>` artifact is uploaded with `retention-days: 3`, and the
+same logs are dumped to stdout for in-UI debugging.
 
 ### Reusable workflow: `lhci.yml`
 
@@ -1187,7 +1231,8 @@ after two weeks of green data.
 - `e2e_test (api)` log shows `Pulling ghcr.io/<owner>/<repo>/api:<sha>` and
   `--no-build`.
 - `cargo test --test e2e -- --test-threads=1` passes.
-- Artifacts: `compose.log`, `playwright-report`, `test-results`.
+- Artifacts (always): `playwright-report`, `test-results`. On failure only:
+  `docker-logs-<app>` (3-day retention) + stdout dump.
 
 #### Task 8: lhci.yml
 

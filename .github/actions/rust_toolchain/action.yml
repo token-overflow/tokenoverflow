@@ -1,0 +1,34 @@
+name: Rust Toolchain
+description: >-
+  Install a pinned Rust toolchain and attach Swatinem's rust-cache. The
+  `toolchain` input feeds both dtolnay/rust-toolchain and the cache key.
+
+inputs:
+  toolchain:
+    description: Rust toolchain to install (`stable` or `nightly`).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Validate toolchain input
+      shell: bash
+      env:
+        INPUT_TOOLCHAIN: ${{ inputs.toolchain }}
+      run: |
+        case "${INPUT_TOOLCHAIN}" in
+          stable|nightly) ;;
+          *) echo "Invalid toolchain: ${INPUT_TOOLCHAIN}" >&2; exit 1 ;;
+        esac
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9  # stable
+      with:
+        toolchain: ${{ inputs.toolchain }}
+
+    # `shared-key` keeps the cache stable across jobs; arch + toolchain
+    # avoid cross-poisoning between stable and nightly.
+    - name: Restore Cargo + target cache
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
+      with:
+        shared-key: arm64-${{ inputs.toolchain }}
