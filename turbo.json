@@ -5,7 +5,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build", "gen:api-client"],
-      "outputs": ["dist/**", ".output/**"]
+      "outputs": ["dist/**", ".output/**", "src/routeTree.gen.ts"]
     },
     "gen:api-client": {
       "inputs": [
@@ -20,7 +20,7 @@
       "persistent": true
     },
     "check": {
-      "dependsOn": ["^build", "gen:api-client"]
+      "dependsOn": ["^build", "gen:api-client", "build"]
     },
     "lint": {
       "dependsOn": ["^build", "gen:api-client"]

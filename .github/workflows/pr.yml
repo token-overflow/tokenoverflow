@@ -1,0 +1,169 @@
+name: PR
+
+on:
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 5
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+      ts: ${{ steps.filter.outputs.ts }}
+      landing: ${{ steps.filter.outputs.landing }}
+      web: ${{ steps.filter.outputs.web }}
+      api: ${{ steps.filter.outputs.api }}
+      embedding: ${{ steps.filter.outputs.embedding }}
+      docker: ${{ steps.filter.outputs.docker }}
+      workflows: ${{ steps.filter.outputs.workflows }}
+      terraform: ${{ steps.filter.outputs.terraform }}
+      shell: ${{ steps.filter.outputs.shell }}
+      markdown: ${{ steps.filter.outputs.markdown }}
+      openapi: ${{ steps.filter.outputs.openapi }}
+      astro: ${{ steps.filter.outputs.astro }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Per-surface inclusions
+        id: filter
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36  # v3.0.2
+        with:
+          filters: |
+            rust:
+              - 'apps/api/**'
+              - 'apps/embedding_service/**'
+              - 'apps/so_tag_sync/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            ts:
+              - 'apps/web/**'
+              - 'apps/landing/**'
+              - 'packages/**'
+              - 'apps/api/openapi.json'
+              - 'bun.lock'
+              - 'bunfig.toml'
+              - 'turbo.json'
+            landing:
+              - 'apps/landing/**'
+            web:
+              - 'apps/web/**'
+            api:
+              - 'apps/api/**'
+            embedding:
+              - 'apps/embedding_service/**'
+            docker:
+              - 'docker-compose.yml'
+              - 'apps/*/Dockerfile'
+            workflows:
+              - '.github/workflows/**'
+              - '.github/actions/**'
+            terraform:
+              - 'terraform/**'
+              - '**/*.tf'
+              - '**/*.tftpl'
+            shell:
+              - '**/*.sh'
+              - 'scripts/**'
+            markdown:
+              - '**/*.md'
+              - '**/*.mdx'
+            openapi:
+              - 'apps/api/openapi.json'
+            astro:
+              - 'apps/landing/**/*.astro'
+
+  lint:
+    needs: prepare
+    if: |
+      needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.ts == 'true' ||
+      needs.prepare.outputs.shell == 'true' || needs.prepare.outputs.markdown == 'true' ||
+      needs.prepare.outputs.terraform == 'true' || needs.prepare.outputs.astro == 'true' ||
+      needs.prepare.outputs.openapi == 'true' || needs.prepare.outputs.workflows == 'true'
+    uses: ./.github/workflows/lint.yml
+    with:
+      rust: ${{ needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.workflows == 'true' }}
+      ts: ${{ needs.prepare.outputs.ts == 'true' || needs.prepare.outputs.workflows == 'true' }}
+      shell: ${{ needs.prepare.outputs.shell == 'true' || needs.prepare.outputs.workflows == 'true' }}
+      markdown: ${{ needs.prepare.outputs.markdown == 'true' || needs.prepare.outputs.workflows == 'true' }}
+      terraform: ${{ needs.prepare.outputs.terraform == 'true' || needs.prepare.outputs.workflows == 'true' }}
+      astro: ${{ needs.prepare.outputs.astro == 'true' || needs.prepare.outputs.workflows == 'true' }}
+      openapi: ${{ needs.prepare.outputs.openapi == 'true' || needs.prepare.outputs.workflows == 'true' }}
+      workflows: ${{ needs.prepare.outputs.workflows == 'true' }}
+    secrets: inherit
+
+  type_check:
+    needs: prepare
+    if: needs.prepare.outputs.ts == 'true' || needs.prepare.outputs.workflows == 'true'
+    uses: ./.github/workflows/type_check.yml
+    with:
+      ts: ${{ needs.prepare.outputs.ts == 'true' || needs.prepare.outputs.workflows == 'true' }}
+    secrets: inherit
+
+  unit_test:
+    needs: prepare
+    if: |
+      needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.ts == 'true' ||
+      needs.prepare.outputs.shell == 'true' || needs.prepare.outputs.workflows == 'true'
+    uses: ./.github/workflows/unit_test.yml
+    with:
+      rust: ${{ needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.workflows == 'true' }}
+      ts: ${{ needs.prepare.outputs.ts == 'true' || needs.prepare.outputs.workflows == 'true' }}
+      shell: ${{ needs.prepare.outputs.shell == 'true' || needs.prepare.outputs.workflows == 'true' }}
+    secrets: inherit
+
+  integration_test:
+    needs: prepare
+    if: needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.workflows == 'true'
+    uses: ./.github/workflows/integration_test.yml
+    with:
+      rust: ${{ needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.workflows == 'true' }}
+    secrets: inherit
+
+  security_audit:
+    needs: prepare
+    if: |
+      needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.ts == 'true' ||
+      needs.prepare.outputs.docker == 'true' || needs.prepare.outputs.workflows == 'true'
+    uses: ./.github/workflows/security_audit.yml
+    with:
+      rust: ${{ needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.workflows == 'true' }}
+      ts: ${{ needs.prepare.outputs.ts == 'true' || needs.prepare.outputs.workflows == 'true' }}
+      docker: ${{ needs.prepare.outputs.docker == 'true' || needs.prepare.outputs.workflows == 'true' }}
+    secrets: inherit
+
+  required:
+    name: Required
+    needs: [ prepare, lint, type_check, unit_test, integration_test, security_audit ]
+    if: always()
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 5
+    steps:
+      - name: Fail if conditional jobs failed
+        if: |
+          ((needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.ts == 'true' ||
+            needs.prepare.outputs.shell == 'true' || needs.prepare.outputs.markdown == 'true' ||
+            needs.prepare.outputs.terraform == 'true' || needs.prepare.outputs.astro == 'true' ||
+            needs.prepare.outputs.openapi == 'true' || needs.prepare.outputs.workflows == 'true') &&
+           needs.lint.result != 'success') ||
+          ((needs.prepare.outputs.ts == 'true' || needs.prepare.outputs.workflows == 'true') &&
+           needs.type_check.result != 'success') ||
+          ((needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.ts == 'true' ||
+            needs.prepare.outputs.shell == 'true' || needs.prepare.outputs.workflows == 'true') &&
+           needs.unit_test.result != 'success') ||
+          ((needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.workflows == 'true') &&
+           needs.integration_test.result != 'success') ||
+          ((needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.ts == 'true' ||
+            needs.prepare.outputs.docker == 'true' || needs.prepare.outputs.workflows == 'true') &&
+           needs.security_audit.result != 'success')
+        run: exit 1

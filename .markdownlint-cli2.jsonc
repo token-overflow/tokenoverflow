@@ -7,9 +7,9 @@
   ],
   "ignores": [
     ".github",
-    ".agents/skills/postgres",
-    ".agents/skills/turborepo",
-    ".agents/skills/workos"
+    // Skill prose follows author/upstream conventions, not project lint rules.
+    ".agents/skills",
+    ".claude/skills"
   ],
   // Skip files matched by `.gitignore` (covers `node_modules/`, `target/`, etc.).
   "gitignore": true
