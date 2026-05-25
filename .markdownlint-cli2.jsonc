@@ -1,0 +1,16 @@
+// Single source of truth for markdownlint-cli2 globs/ignores; shared by
+// pre-commit and CI. Rules live in the sibling `.markdownlint.json`,
+// auto-discovered by cli2.
+{
+  "globs": [
+    "**/*.md"
+  ],
+  "ignores": [
+    ".github",
+    ".agents/skills/postgres",
+    ".agents/skills/turborepo",
+    ".agents/skills/workos"
+  ],
+  // Skip files matched by `.gitignore` (covers `node_modules/`, `target/`, etc.).
+  "gitignore": true
+}

@@ -14,6 +14,13 @@ exclude = [
   "^https://api\\.tokenoverflow\\.io(/|$|#)",
 ]
 
+# Vendored skill content from third parties; links are their problem, not ours.
+exclude_path = [
+  ".agents/skills/postgres",
+  ".agents/skills/turborepo",
+  ".agents/skills/workos",
+]
+
 # Allow private loopbacks to keep the test harness simple.
 exclude_loopback = false
 

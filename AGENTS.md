@@ -10,8 +10,10 @@ be used:
 3. The human reviews the design document and provides feedback until approval.
 4. The `engineer` agent implements the design using the `implement-design` skill.
     a. Design is implemented as a series of stacked PRs, one per vertical task.
-    b. Each PR is reviewed by the `code-reviewer` agent using the `code-review` skill.
-    c. The `engineer` iterates on the implementation until the `code-reviewer` approves.
+    b. Each PR is reviewed by the `code-reviewer` agent using the
+       `code-review` skill.
+    c. The `engineer` iterates on the implementation until the `code-reviewer`
+       approves.
     d. The human reviews the final changes.
     e. The `engineer` iterates until the human approves.
 
