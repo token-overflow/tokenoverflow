@@ -1,0 +1,44 @@
+name: Docker Compose
+description: >-
+  Log in to GHCR, export the image tag/repo env vars, pull, and start a
+  Docker Compose profile against a pinned image tag.
+
+inputs:
+  profile:
+    description: Compose profile to bring up (e.g. `api`, `landing`, `web`).
+    required: true
+  tag:
+    description: Image tag to pull (e.g. the PR head SHA).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Log in to GHCR
+      uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3.7.0
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+
+    # GHCR paths are case-sensitive and must be lowercase.
+    - name: Export environment variables
+      shell: bash
+      env:
+        INPUT_TAG: ${{ inputs.tag }}
+      run: |
+        echo "TOKENOVERFLOW_IMAGE_TAG=${INPUT_TAG}" >> "$GITHUB_ENV"
+        echo "TOKENOVERFLOW_IMAGE_REPO=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+    - name: Pull images
+      shell: bash
+      env:
+        INPUT_PROFILE: ${{ inputs.profile }}
+      run: docker compose --profile "${INPUT_PROFILE}" pull --policy always
+
+    # `--no-build` guards against silent rebuilds when a pull fails.
+    - name: Start stack
+      shell: bash
+      env:
+        INPUT_PROFILE: ${{ inputs.profile }}
+      run: docker compose --profile "${INPUT_PROFILE}" up -d --no-build --wait --wait-timeout 600
