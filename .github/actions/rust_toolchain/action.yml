@@ -7,6 +7,10 @@ inputs:
   toolchain:
     description: Rust toolchain to install (`stable` or `nightly`).
     required: true
+  components:
+    description: Comma-separated rustup components (e.g. `rustfmt, clippy`).
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -25,6 +29,7 @@ runs:
       uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9  # stable
       with:
         toolchain: ${{ inputs.toolchain }}
+        components: ${{ inputs.components }}
 
     # `shared-key` keeps the cache stable across jobs; arch + toolchain
     # avoid cross-poisoning between stable and nightly.

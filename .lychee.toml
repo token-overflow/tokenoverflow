@@ -5,6 +5,9 @@ exclude = [
   # lychee hits 403/429 on cold caches.
   "^https://github\\.com/.*/raw/",
 
+  # Cloudflare dashboard is auth-only; unauthenticated requests get 403.
+  "^https://dash\\.cloudflare\\.com",
+
   # TODO: remove once tokenoverflow.io is live (tracked in
   # docs/design/2026_04_20_landing_page.md).
   "^https://tokenoverflow\\.io(/|$|#)",

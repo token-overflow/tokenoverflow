@@ -8,9 +8,10 @@ description: You **must** use this when implementing the code for an approved de
 ## Workflow
 
 1. Read the entire design document end to end.
-2. All tasks from the design document will be implemented as stacked PRs. For every task:
-    a. Create branch `feature/{{design-title}}-{{n}}` rebased from the previous task branch
-        or the latest `origin/main` if it's the first task.
+2. All tasks from the design document will be implemented as stacked PRs.
+    For every task:
+    a. Create branch `feature/{{design-title}}-{{n}}` rebased from the
+        previous task branch or the latest `origin/main` if it's the first task.
     b. Implement the task using the guidelines below.
     c. Use `/code-review` skill to get feedback and iterate until it's perfect.
     d. **CRITICAL:** Ask for user's final approval. Iterate until approved.
@@ -47,29 +48,33 @@ You **must** follow these guidelines at all times:
         - Integration: In-process integration tests with external dependencies
         - E2E: Black-box testing of the whole system based on user stories
     - Domain Driven Design (DDD):
-        - Use entities, value objects, aggregates, repositories, and services to model
-        complex domains.
-        - Use ubiquitous language that is shared between developers and domain experts.
+        - Use entities, value objects, aggregates, repositories, and services
+        to model complex domains.
+        - Use ubiquitous language that is shared between developers and domain
+        experts.
     - Functional Core, Imperative Shell (FCIS):
         - Functional core: Unit testable business logic
         - Imperative shell: External dependencies like I/O, use integration tests
     - Hexagonal Architecture
         - Core business logic is isolated from external systems, allowing easy swapping.
     - SOLID Principles
-        - Single Responsibility Principle (SRP): A class should have one job or purpose.
-        - Open-Closed Principle (OCP): New features should be added by adding new code, not
-        modifying existing code.
-        - Liskov Substitution Principle (LSP): Subclasses must behave in a way that doesn't
-        break the functionality of the parent class.
-        - Interface Segregation Principle (ISP): Create smaller, specific interfaces rather than
-        one large, general-purpose one.
-        - Dependency Inversion Principle (DIP): High-level modules should not depend on low-level
-        modules; both should depend on abstractions (interfaces).
+        - Single Responsibility Principle (SRP): A class should have one job
+        or purpose.
+        - Open-Closed Principle (OCP): New features should be added by adding
+        new code, not modifying existing code.
+        - Liskov Substitution Principle (LSP): Subclasses must behave in a way
+        that doesn't break the functionality of the parent class.
+        - Interface Segregation Principle (ISP): Create smaller, specific
+        interfaces rather than one large, general-purpose one.
+        - Dependency Inversion Principle (DIP): High-level modules should not
+        depend on low-level modules; both should depend on abstractions
+        (interfaces).
     - Clean Code
         - No duplication
         - Readable over clever
-        - Comments only when necessary. Explain the why not the what. Make sure it's easy to
-        understand for people with no context, don't make it too information dense.
+        - Comments only when necessary. Explain the why not the what. Make
+        sure it's easy to understand for people with no context, don't make it
+        too information dense.
         - Clear separation of concerns
 
 ## Validation

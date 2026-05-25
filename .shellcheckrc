@@ -1,0 +1,3 @@
+# Mock functions inside bashunit set_up/tear_down look unreachable to static
+# analysis but are invoked indirectly when sourced tests run.
+disable=SC2317

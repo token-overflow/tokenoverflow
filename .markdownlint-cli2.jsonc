@@ -7,6 +7,9 @@
   ],
   "ignores": [
     ".github",
+    // `.claude/skills` is a symlink to `.agents/skills`; skip to avoid
+    // double-scanning vendored content under both paths.
+    ".claude",
     ".agents/skills/postgres",
     ".agents/skills/turborepo",
     ".agents/skills/workos"

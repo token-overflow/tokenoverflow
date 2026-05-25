@@ -86,6 +86,7 @@ jobs:
         uses: ./.github/actions/rust_toolchain
         with:
           toolchain: nightly
+          components: rustfmt, clippy
 
       - name: Cargo fmt
         run: cargo +nightly fmt --all -- --check
@@ -194,6 +195,11 @@ jobs:
         uses: ./.github/actions/rust_toolchain
         with:
           toolchain: stable
+
+      # Release build links against system libpq; not preinstalled on
+      # `ubuntu-24.04-arm`. Mac dev hosts get libpq via Homebrew.
+      - name: Install libpq
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libpq-dev
 
       # Project-specific: regenerate openapi.json from utoipa annotations and diff.
       - name: Check OpenAPI spec drift
