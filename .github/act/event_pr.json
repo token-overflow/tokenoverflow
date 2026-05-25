@@ -3,13 +3,17 @@
   "action": "opened",
   "pull_request": {
     "head": {
-      "ref": "feature-branch"
+      "ref": "feature-branch",
+      "repo": {
+        "full_name": "token-overflow/tokenoverflow"
+      }
     },
     "base": {
       "ref": "main"
     }
   },
   "repository": {
-    "default_branch": "main"
+    "default_branch": "main",
+    "full_name": "token-overflow/tokenoverflow"
   }
 }
