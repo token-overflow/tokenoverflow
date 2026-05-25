@@ -14,7 +14,7 @@ description: You **must** use this when implementing the code for an approved de
     b. Implement the task using the guidelines below.
     c. Use `/code-review` skill to get feedback and iterate until it's perfect.
     d. **CRITICAL:** Ask for user's final approval. Iterate until approved.
-    e. Create a PR with title: `[{{emoji}} {{design-title}} | Part {{n}}] {{task-name}}`.
+    e. Create a PR with title: `[{{common_emoji}} {{design-title}} | Part {{n}}] {{task-name}}`.
     f. Ask user to `/compact` or `/clear` before moving to the next task.
 
 ## Guidelines

@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     outputs:
+      # Per-surface filter outputs, passed as `with:` inputs to reusables.
       rust: ${{ steps.filter.outputs.rust }}
       ts: ${{ steps.filter.outputs.ts }}
       landing: ${{ steps.filter.outputs.landing }}
@@ -31,6 +32,16 @@ jobs:
       markdown: ${{ steps.filter.outputs.markdown }}
       openapi: ${{ steps.filter.outputs.openapi }}
       astro: ${{ steps.filter.outputs.astro }}
+      # Per-job gates, consumed by dispatch `if:` and the aggregator. The
+      # fork-only gates fold the same-repo guard in so callers stay one-line.
+      same_repo: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+      lint_needed: ${{ steps.filter.outputs.rust == 'true' || steps.filter.outputs.ts == 'true' || steps.filter.outputs.shell == 'true' || steps.filter.outputs.markdown == 'true' || steps.filter.outputs.terraform == 'true' || steps.filter.outputs.astro == 'true' || steps.filter.outputs.openapi == 'true' || steps.filter.outputs.workflows == 'true' }}
+      type_check_needed: ${{ steps.filter.outputs.ts == 'true' || steps.filter.outputs.workflows == 'true' }}
+      unit_test_needed: ${{ steps.filter.outputs.rust == 'true' || steps.filter.outputs.ts == 'true' || steps.filter.outputs.shell == 'true' || steps.filter.outputs.workflows == 'true' }}
+      integration_test_needed: ${{ steps.filter.outputs.rust == 'true' || steps.filter.outputs.workflows == 'true' }}
+      security_audit_needed: ${{ steps.filter.outputs.rust == 'true' || steps.filter.outputs.ts == 'true' || steps.filter.outputs.docker == 'true' || steps.filter.outputs.workflows == 'true' }}
+      docker_build_needed: ${{ (steps.filter.outputs.rust == 'true' || steps.filter.outputs.docker == 'true' || steps.filter.outputs.workflows == 'true') && github.event.pull_request.head.repo.full_name == github.repository }}
+      e2e_test_needed: ${{ (steps.filter.outputs.api == 'true' || steps.filter.outputs.embedding == 'true' || steps.filter.outputs.landing == 'true' || steps.filter.outputs.web == 'true' || steps.filter.outputs.docker == 'true' || steps.filter.outputs.openapi == 'true' || steps.filter.outputs.workflows == 'true') && github.event.pull_request.head.repo.full_name == github.repository }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -85,11 +96,7 @@ jobs:
 
   lint:
     needs: prepare
-    if: |
-      needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.ts == 'true' ||
-      needs.prepare.outputs.shell == 'true' || needs.prepare.outputs.markdown == 'true' ||
-      needs.prepare.outputs.terraform == 'true' || needs.prepare.outputs.astro == 'true' ||
-      needs.prepare.outputs.openapi == 'true' || needs.prepare.outputs.workflows == 'true'
+    if: needs.prepare.outputs.lint_needed == 'true'
     uses: ./.github/workflows/lint.yml
     with:
       rust: ${{ needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.workflows == 'true' }}
@@ -104,7 +111,7 @@ jobs:
 
   type_check:
     needs: prepare
-    if: needs.prepare.outputs.ts == 'true' || needs.prepare.outputs.workflows == 'true'
+    if: needs.prepare.outputs.type_check_needed == 'true'
     uses: ./.github/workflows/type_check.yml
     with:
       ts: ${{ needs.prepare.outputs.ts == 'true' || needs.prepare.outputs.workflows == 'true' }}
@@ -112,9 +119,7 @@ jobs:
 
   unit_test:
     needs: prepare
-    if: |
-      needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.ts == 'true' ||
-      needs.prepare.outputs.shell == 'true' || needs.prepare.outputs.workflows == 'true'
+    if: needs.prepare.outputs.unit_test_needed == 'true'
     uses: ./.github/workflows/unit_test.yml
     with:
       rust: ${{ needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.workflows == 'true' }}
@@ -124,7 +129,7 @@ jobs:
 
   integration_test:
     needs: prepare
-    if: needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.workflows == 'true'
+    if: needs.prepare.outputs.integration_test_needed == 'true'
     uses: ./.github/workflows/integration_test.yml
     with:
       rust: ${{ needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.workflows == 'true' }}
@@ -132,9 +137,7 @@ jobs:
 
   security_audit:
     needs: prepare
-    if: |
-      needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.ts == 'true' ||
-      needs.prepare.outputs.docker == 'true' || needs.prepare.outputs.workflows == 'true'
+    if: needs.prepare.outputs.security_audit_needed == 'true'
     uses: ./.github/workflows/security_audit.yml
     with:
       rust: ${{ needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.workflows == 'true' }}
@@ -142,14 +145,10 @@ jobs:
       docker: ${{ needs.prepare.outputs.docker == 'true' || needs.prepare.outputs.workflows == 'true' }}
     secrets: inherit
 
-  # Fork PRs cannot write to GHCR; the fork guard skips this job entirely.
-  # The required aggregator exempts docker_build on forks.
+  # Same-repo only: forks cannot write to GHCR via `secrets.GITHUB_TOKEN`.
   docker_build:
     needs: [ prepare, lint, type_check, unit_test, integration_test, security_audit ]
-    if: |
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      (needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.docker == 'true' ||
-       needs.prepare.outputs.workflows == 'true')
+    if: needs.prepare.outputs.docker_build_needed == 'true'
     # Job-level permissions override the workflow-level ceiling so the called
     # reusable can declare `packages: write` without it being capped to `none`.
     permissions:
@@ -158,32 +157,30 @@ jobs:
     uses: ./.github/workflows/docker_build.yml
     secrets: inherit
 
+  # Same-repo only: forks cannot pull from GHCR via `secrets.GITHUB_TOKEN`.
+  e2e_test:
+    needs: [ prepare, docker_build ]
+    if: needs.prepare.outputs.e2e_test_needed == 'true'
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/e2e_test.yml
+    secrets: inherit
+
   required:
     name: Required
-    needs: [ prepare, lint, type_check, unit_test, integration_test, security_audit, docker_build ]
+    needs: [ prepare, lint, type_check, unit_test, integration_test, security_audit, docker_build, e2e_test ]
     if: always()
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     steps:
       - name: Fail if conditional jobs failed
         if: |
-          ((needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.ts == 'true' ||
-            needs.prepare.outputs.shell == 'true' || needs.prepare.outputs.markdown == 'true' ||
-            needs.prepare.outputs.terraform == 'true' || needs.prepare.outputs.astro == 'true' ||
-            needs.prepare.outputs.openapi == 'true' || needs.prepare.outputs.workflows == 'true') &&
-           needs.lint.result != 'success') ||
-          ((needs.prepare.outputs.ts == 'true' || needs.prepare.outputs.workflows == 'true') &&
-           needs.type_check.result != 'success') ||
-          ((needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.ts == 'true' ||
-            needs.prepare.outputs.shell == 'true' || needs.prepare.outputs.workflows == 'true') &&
-           needs.unit_test.result != 'success') ||
-          ((needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.workflows == 'true') &&
-           needs.integration_test.result != 'success') ||
-          ((needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.ts == 'true' ||
-            needs.prepare.outputs.docker == 'true' || needs.prepare.outputs.workflows == 'true') &&
-           needs.security_audit.result != 'success') ||
-          (github.event.pull_request.head.repo.full_name == github.repository &&
-           (needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.docker == 'true' ||
-            needs.prepare.outputs.workflows == 'true') &&
-           needs.docker_build.result != 'success')
+          (needs.prepare.outputs.lint_needed == 'true' && needs.lint.result != 'success') ||
+          (needs.prepare.outputs.type_check_needed == 'true' && needs.type_check.result != 'success') ||
+          (needs.prepare.outputs.unit_test_needed == 'true' && needs.unit_test.result != 'success') ||
+          (needs.prepare.outputs.integration_test_needed == 'true' && needs.integration_test.result != 'success') ||
+          (needs.prepare.outputs.security_audit_needed == 'true' && needs.security_audit.result != 'success') ||
+          (needs.prepare.outputs.docker_build_needed == 'true' && needs.docker_build.result != 'success') ||
+          (needs.prepare.outputs.e2e_test_needed == 'true' && needs.e2e_test.result != 'success')
         run: exit 1

@@ -1,0 +1,111 @@
+name: E2E Test
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  e2e_test:
+    name: E2E Test (${{ matrix.app }})
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: api
+            timeout: 30
+          - app: landing
+            timeout: 35
+          - app: web
+            timeout: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Start Docker Compose stack
+        if: env.ACT != 'true'
+        uses: ./.github/actions/docker_compose_up
+        with:
+          profile: ${{ matrix.app }}
+          tag: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      # diesel `postgres` feature links against libpq at test time. Deploy
+      # workflows side-step this via `--features bundled-libs`; tests don't.
+      - name: Install libpq
+        if: matrix.app == 'api'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libpq-dev
+
+      - name: Install Rust stable toolchain
+        if: matrix.app == 'api'
+        uses: ./.github/actions/rust_toolchain
+        with:
+          toolchain: stable
+
+      - name: Install Bun & dependencies
+        if: matrix.app == 'landing' || matrix.app == 'web'
+        uses: ./.github/actions/bun_install
+
+      # Playwright shells out to Node; pin Node 22 to match `type_check.yml`.
+      - name: Setup Node
+        if: matrix.app == 'landing' || matrix.app == 'web'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: '22'
+
+      - name: Install Playwright browsers
+        if: matrix.app == 'landing' || matrix.app == 'web'
+        uses: ./.github/actions/playwright_install
+        with:
+          app: ${{ matrix.app }}
+
+      # The e2e tier shares one live Postgres database; `--test-threads=1`
+      # serializes the suite to avoid cross-test contention.
+      - name: Run api e2e
+        if: matrix.app == 'api' && env.ACT != 'true'
+        run: cargo test --test e2e -- --test-threads=1
+
+      - name: Run landing e2e
+        if: matrix.app == 'landing' && env.ACT != 'true'
+        run: bun run --filter=@tokenoverflow/landing test:e2e
+
+      - name: Run web e2e
+        if: matrix.app == 'web' && env.ACT != 'true'
+        run: bun run --filter=@tokenoverflow/web test:e2e
+
+      # Without `dest:` the action streams logs to stdout for inline UI debugging.
+      - name: Stream Docker logs to stdout
+        if: failure() && env.ACT != 'true'
+        uses: step-security/gh-docker-logs@561ab0d8664f002c3eb106f4cce2799cdc4510d7  # v2.2.7
+
+      - name: Collect Docker logs to files
+        if: failure() && env.ACT != 'true'
+        uses: step-security/gh-docker-logs@561ab0d8664f002c3eb106f4cce2799cdc4510d7  # v2.2.7
+        with:
+          dest: ./docker-logs
+
+      - name: Archive Docker logs
+        if: failure() && env.ACT != 'true'
+        run: tar -czf docker-logs.tar.gz ./docker-logs
+
+      - name: Upload Docker logs
+        if: failure() && env.ACT != 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: docker-logs-${{ matrix.app }}
+          path: docker-logs.tar.gz
+          retention-days: 3
+
+      - name: Upload Playwright artifacts
+        if: failure() && (matrix.app == 'landing' || matrix.app == 'web')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: playwright-${{ matrix.app }}
+          path: |
+            apps/${{ matrix.app }}/playwright-report/**
+            apps/${{ matrix.app }}/test-results/**
+          if-no-files-found: ignore
