@@ -17,7 +17,8 @@ E2E tests require the **full Docker stack** to be running.
 
 ```bash
 # Start all services
-docker compose up -d
+source scripts/src/includes.sh
+redeploy_local
 
 # Run integration tests
 cargo test -p tokenoverflow --test e2e
