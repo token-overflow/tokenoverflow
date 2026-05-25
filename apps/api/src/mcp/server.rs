@@ -37,8 +37,9 @@ impl TokenOverflowServer {
 impl ServerHandler for TokenOverflowServer {
     fn get_info(&self) -> rmcp::model::ServerInfo {
         rmcp::model::ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
-            .with_instructions(include_str!(
-                "../../../../integrations/common/instructions.md"
-            ))
+            .with_instructions(include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../integrations/claude/instructions.md"
+            )))
     }
 }

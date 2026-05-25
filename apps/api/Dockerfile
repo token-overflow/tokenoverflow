@@ -22,7 +22,7 @@ FROM chef AS planner
 COPY Cargo.toml ./Cargo.toml
 COPY Cargo.lock ./Cargo.lock
 COPY apps/api ./apps/api
-COPY integrations/common ./integrations/common
+COPY integrations/claude/instructions.md ./integrations/claude/instructions.md
 
 # Replace workspace manifest with single-member workspace
 RUN printf '[workspace]\nresolver = "2"\nmembers = ["apps/api"]\n' > Cargo.toml
@@ -43,7 +43,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 COPY Cargo.toml ./Cargo.toml
 COPY Cargo.lock ./Cargo.lock
 COPY apps/api ./apps/api
-COPY integrations/common ./integrations/common
+COPY integrations/claude/instructions.md ./integrations/claude/instructions.md
 
 # Replace workspace manifest with single-member workspace
 RUN printf '[workspace]\nresolver = "2"\nmembers = ["apps/api"]\n' > Cargo.toml
