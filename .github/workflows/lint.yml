@@ -1,0 +1,217 @@
+name: Lint
+
+on:
+  workflow_call:
+    inputs:
+      rust:
+        description: Lint Rust files
+        type: boolean
+        default: false
+      ts:
+        description: Lint TypeScript files
+        type: boolean
+        default: false
+      shell:
+        description: Lint shell scripts
+        type: boolean
+        default: false
+      markdown:
+        description: Lint markdown files
+        type: boolean
+        default: false
+      terraform:
+        description: Lint terraform files
+        type: boolean
+        default: false
+      api:
+        description: Reserved for downstream gating
+        type: boolean
+        default: false
+      astro:
+        description: Run astro guards
+        type: boolean
+        default: false
+      openapi:
+        description: Check OpenAPI spec drift
+        type: boolean
+        default: false
+      workflows:
+        description: Reserved for orchestrator-wide gating
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      rust:
+        type: boolean
+        default: true
+      ts:
+        type: boolean
+        default: true
+      shell:
+        type: boolean
+        default: true
+      markdown:
+        type: boolean
+        default: true
+      terraform:
+        type: boolean
+        default: true
+      api:
+        type: boolean
+        default: true
+      astro:
+        type: boolean
+        default: true
+      openapi:
+        type: boolean
+        default: true
+      workflows:
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  rust_lint:
+    name: Rust Lint
+    if: inputs.rust
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Install Rust nightly toolchain
+        uses: ./.github/actions/rust_toolchain
+        with:
+          toolchain: nightly
+
+      - name: Cargo fmt
+        run: cargo +nightly fmt --all -- --check
+
+      - name: Cargo clippy
+        run: cargo +nightly clippy --workspace --tests -- -D warnings
+
+      - name: Cargo machete
+        uses: bnjbvr/cargo-machete@ac30a525c0a8d163a92d727b3ff079ee3f6ecb08  # v0.9.2
+
+  ts_lint:
+    name: TypeScript Lint
+    if: inputs.ts
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          # Turbo `--affected` needs the previous commit to diff against.
+          fetch-depth: 2
+
+      - name: Install Bun & dependencies
+        uses: ./.github/actions/bun_install
+
+      - name: Turbo lint
+        run: bun run turbo run lint --affected
+
+      - name: Turbo format:check
+        run: bun run turbo run format:check --affected
+
+      - name: Turbo lint:css
+        run: bun run turbo run lint:css --affected
+
+  shell_lint:
+    name: Shell Lint
+    if: inputs.shell
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Shellcheck
+        shell: bash
+        run: |
+          shopt -s globstar
+          shellcheck -x scripts/**/*.sh
+
+  markdown_lint:
+    name: Markdown Lint
+    if: inputs.markdown
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      # Globs and ignores come from `.markdownlint-cli2.jsonc` (auto-discovered).
+      - name: Markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@fa0cd0f1a052f54da593c83860f2292982f5d142  # v23.2.0
+
+  lychee:
+    name: Lychee
+    if: inputs.markdown
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Lychee
+        uses: lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411  # v2.8.0
+        with:
+          args: --config .lychee.toml --no-progress .
+
+  astro_guards:
+    name: Astro Guards
+    if: inputs.astro
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      # `forbid_is_inline.sh` expects files as argv; `forbid_raw_raster_img.sh`
+      # scans the tree itself.
+      - name: Forbid is:inline
+        run: |
+          find apps/landing -type f -name '*.astro' \
+            -exec scripts/src/git_hooks/forbid_is_inline.sh {} +
+
+      - name: Forbid raw raster <img>
+        run: scripts/src/git_hooks/forbid_raw_raster_img.sh
+
+  openapi_drift:
+    name: OpenAPI Drift
+    if: inputs.openapi || inputs.rust
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Install Rust stable toolchain
+        uses: ./.github/actions/rust_toolchain
+        with:
+          toolchain: stable
+
+      # Project-specific: regenerate openapi.json from utoipa annotations and diff.
+      - name: Check OpenAPI spec drift
+        run: scripts/src/git_hooks/check_openapi_spec_drift.sh
+
+  tflint:
+    name: TFLint
+    if: inputs.terraform
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Install tflint
+        uses: terraform-linters/setup-tflint@4cb9feea73331a35b422df102992a03a44a3bb33  # v6.2.1
+        with:
+          tflint_version: v0.62.1
+
+      - name: TFLint
+        run: scripts/src/git_hooks/tflint.sh

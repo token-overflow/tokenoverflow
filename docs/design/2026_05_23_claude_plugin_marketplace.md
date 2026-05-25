@@ -250,7 +250,7 @@ git tag (e.g. `v0.0.1`) on push.
 
 **Rationale:** Rejected. Premature automation.
 
-### Decision 3: Fix the `${CLAUDE_PLUGIN_ROOT}/instructions.md` cross-directory reference
+### Decision 3: Fix the cross-directory reference in `${CLAUDE_PLUGIN_ROOT}`
 
 Today `integrations/claude/hooks/hooks.json` reads
 `${CLAUDE_PLUGIN_ROOT}/instructions.md`. There is a symlink at
