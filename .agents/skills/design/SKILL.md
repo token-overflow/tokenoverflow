@@ -38,11 +38,13 @@ You **must** follow the steps below:
     - Give examples of what each option would look like in practice.
     - Let the user decide which option to pick.
     - Ask for approval before moving to the next section.
-10. Once all key decisions are made, fill out the entire design document.
+10. Once all key decisions are made, fill out the entire design document. Make
+    sure to follow the template style, format, and rule.
 11. If a PRD was provided, make sure all its requirements are now satisfied.
 12. Get a review from the `design-reviewer` subagent. For each finding, ask the
     user's approval.
-13. Once done, ask for a review and keep iterating until you get approval.
+13. Once done, ask for a review from the user, and keep iterating until you get
+ approval.
 
 Guidelines you **must** follow:
 
@@ -60,6 +62,8 @@ Guidelines you **must** follow:
     if there is a simpler and more scalable way to achieve the same goal.
 - Focus on the key decisions, overall architecture, interfaces, structures, and
     patterns rather than implementation details.
+- Be concise. Do not add redundant information. Ignore unnecessary verbosity if
+    the intent is obvious.
 
 **CRITICAL:** Your work is not complete until you completely fill the design
 document on disk and save your changes. Do not leave an empty template. Do

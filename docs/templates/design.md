@@ -1,29 +1,41 @@
 # Design: {{name}}
 
+Be concise, but clear for future readers with no context.
+Do not add redundant information.
+Ignore unnecessary verbosity if the intent is obvious.
+Design documents over 1,000 lines are a red flag, but not a hard rule.
+Do not add new sections.
+
 ## Context & Problem
 
 > **Definition:** What we are solving and why now. One short paragraph that
 > a future engineer can read cold.
 > **Rule:** Reference the brief, PRD, or issue if one exists. State the user,
 > system, or business problem in plain language. Do not describe the solution
-> here.
+> here. Describe the problem only in one paragraph.
 
 ## In Scope
 
 > **Definition:** The capabilities this design delivers.
 > **Rule:** If removing an item does not break a task, it does not belong here.
+> Short, easy to understand entries for overall capabilities. Do not list
+> implementation details. One sentence per entry. Focus on overall deliverables,
+> not the task details.
 
 ## Out of Scope
 
 > **Definition:** Things this design deliberately does NOT do.
 > **Rule:** Each entry names the excluded capability. Speculative additions
-> that have no current consumer in the Tasks section belong here.
+> that have no current consumer in the Tasks section belong here. Short, easy
+> to understand entries for overall non-capabilities. Do not list implementation
+> details. One sentence per entry.
 
 ## Terminology
 
 > **Definition:** Any new or domain-specific terms introduced by this design.
 > **Rule:** Should respect the existing terminology used in the codebase. Align
-> on a ubiquitous language.
+> on a ubiquitous language. Short list and one sentence definitions. Only include
+> terms that may not be immediately clear to a future reader.
 
 ## Key Decisions
 
@@ -31,13 +43,19 @@
 > reader of this section alone should understand why the design looks the way
 > it does.
 > **Rule:** Each decision is a question with at least two options. Each option has
-> pros, cons, and a rationale for why it was accepted or rejected.
+> pros, cons, and a rationale for why it was accepted or rejected. Put an example
+> snippet for each option.
+> **IMPORTANT:** This section is the most critical part, especially for future
+> human readers. The options must be clearly explained with enough context and must
+> demonstrate how they would look like in practice with example snippets. Options
+> may not be obvious for the readers.
 
 ### {{key design question 1}}
 
-#### ✅ Option 1: {{option name}}
+#### ✅ Option 1: {{short option name}}
 
 Description of the option and a small example of what it looks like in practice.
+Descriptions should be clear enough for future readers with no context.
 
 **Pros:**
 - ...
@@ -47,9 +65,9 @@ Description of the option and a small example of what it looks like in practice.
 
 **Rationale:**
 
-#### ❌ Option 2: {{option name}}
+#### ❌ Option 2: {{short option name}}
 
-...
+Rationale should include why this option was rejected.
 
 ## Architecture Overview
 
@@ -98,9 +116,10 @@ Description of the option and a small example of what it looks like in practice.
 ## Edge Cases & Constraints
 
 > **Definition:** Special cases, limits, or environmental considerations.
-> **Rule:** Cover anything that could break the implementation if ignored.
+> **Rule:** Cover important things that could break the implementation if ignored.
 > Reference Standards & Specs where the edge case is governed by an external
-> rule (e.g., size limit from an RFC, browser quirk from a W3C note).
+> rule (e.g., size limit from an RFC, browser quirk from a W3C note). Keep it
+> short. One sentence per entry if possible.
 
 ## Test Plan
 
