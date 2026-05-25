@@ -1,3 +1,5 @@
+# TODO(#158): https://github.com/token-overflow/tokenoverflow/issues/158
+# trivy:ignore:AWS-0132
 resource "aws_s3_bucket" "landing" {
   bucket = var.bucket_name
 }

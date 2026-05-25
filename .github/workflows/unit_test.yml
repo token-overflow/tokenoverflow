@@ -1,0 +1,82 @@
+name: Unit Test
+
+on:
+  workflow_call:
+    inputs:
+      rust:
+        description: Run Rust unit tests
+        type: boolean
+        default: false
+      ts:
+        description: Run TypeScript unit tests
+        type: boolean
+        default: false
+      shell:
+        description: Run shell unit tests
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      rust:
+        type: boolean
+        default: true
+      ts:
+        type: boolean
+        default: true
+      shell:
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  vitest_unit:
+    name: Vitest Unit
+    if: inputs.ts
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          # Turbo `--affected` needs the previous commit to diff against.
+          fetch-depth: 2
+
+      - name: Install Bun & dependencies
+        uses: ./.github/actions/bun_install
+
+      - name: Turbo test:coverage
+        run: bun run turbo run test:coverage --affected
+
+  cargo_test_unit:
+    name: Cargo Test Unit
+    if: inputs.rust
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Install Rust stable toolchain
+        uses: ./.github/actions/rust_toolchain
+        with:
+          toolchain: stable
+
+      - name: Cargo test
+        run: cargo test --workspace --lib --test unit
+
+  bashunit:
+    name: Bash Unit
+    if: inputs.shell
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Install bashunit
+        run: curl -s https://bashunit.typeddevs.com/install.sh | bash
+
+      - name: Run bashunit tests
+        run: find scripts/tests -type f -name 'test_*.sh' -exec ./lib/bashunit {} +

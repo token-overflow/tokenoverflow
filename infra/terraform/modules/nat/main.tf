@@ -8,6 +8,8 @@ resource "aws_eip" "nat" {
   }
 }
 
+# TODO(#156): https://github.com/token-overflow/tokenoverflow/issues/156
+# trivy:ignore:AWS-0104
 module "fck_nat" {
   source  = "RaJiska/fck-nat/aws"
   version = "1.4.0"

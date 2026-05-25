@@ -1,0 +1,90 @@
+name: Security Audit
+
+on:
+  workflow_call:
+    inputs:
+      rust:
+        description: Run cargo audit
+        type: boolean
+        default: false
+      ts:
+        description: Run bun audit
+        type: boolean
+        default: false
+      docker:
+        description: Run Trivy when Docker assets changed
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      rust:
+        type: boolean
+        default: true
+      ts:
+        type: boolean
+        default: true
+      docker:
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  trivy:
+    name: Trivy Filesystem Scan
+    if: inputs.rust || inputs.ts || inputs.docker
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Setup Trivy
+        uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514  # v0.2.6
+        with:
+          version: v0.70.0
+
+      - name: Trivy fs scan
+        run: scripts/src/git_hooks/trivy.sh
+
+  cargo_audit:
+    name: Cargo Audit
+    if: inputs.rust
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Install Rust stable toolchain
+        uses: ./.github/actions/rust_toolchain
+        with:
+          toolchain: stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Report all advisories
+        run: cargo audit --deny warnings || true
+
+      - name: Fail on vulnerabilities
+        run: cargo audit
+
+  bun_audit:
+    name: Bun Audit
+    if: inputs.ts
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Install Bun & dependencies
+        uses: ./.github/actions/bun_install
+
+      - name: Report all advisories
+        run: bun audit || true
+
+      - name: Fail on critical advisories
+        run: bun audit --audit-level=critical

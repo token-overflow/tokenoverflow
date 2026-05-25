@@ -126,6 +126,8 @@ resource "aws_cloudfront_cache_policy" "short" {
   }
 }
 
+# TODO(#159): https://github.com/token-overflow/tokenoverflow/issues/159
+# trivy:ignore:AWS-0011
 resource "aws_cloudfront_distribution" "landing" {
   enabled             = true
   is_ipv6_enabled     = true

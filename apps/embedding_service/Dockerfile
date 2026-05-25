@@ -5,7 +5,7 @@ FROM rust:1.93-slim AS chef
 WORKDIR /app
 
 # Install build dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     libssl-dev \
     g++ \
@@ -55,7 +55,7 @@ RUN cargo build --release -p embedding_service
 FROM debian:trixie-slim AS runtime
 
 # Install runtime dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libssl3 \
     curl \

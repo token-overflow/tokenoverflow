@@ -1,0 +1,35 @@
+name: Integration Test
+
+on:
+  workflow_call:
+    inputs:
+      rust:
+        description: Run Rust integration tests
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      rust:
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  rust_integration:
+    name: Rust Integration
+    if: inputs.rust
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Install Rust stable toolchain
+        uses: ./.github/actions/rust_toolchain
+        with:
+          toolchain: stable
+
+      - name: Cargo test integration
+        run: cargo test --workspace --test integration

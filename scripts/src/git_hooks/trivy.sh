@@ -10,7 +10,7 @@ ENTRIES=$(git ls-files --others --ignored --exclude-standard --directory)
 SKIP_DIRS=$(awk '/\/$/ { sub(/\/$/, ""); print }' <<<"$ENTRIES" | paste -sd ',' -)
 SKIP_FILES=$(awk '!/\/$/' <<<"$ENTRIES" | paste -sd ',' -)
 
-ARGS=(fs --disable-telemetry --exit-code 1 --severity='HIGH,CRITICAL')
+ARGS=(fs --disable-telemetry --exit-code 1 --severity='HIGH,CRITICAL' --scanners='vuln,secret,misconfig')
 [ -n "$SKIP_DIRS" ] && ARGS+=(--skip-dirs "$SKIP_DIRS")
 [ -n "$SKIP_FILES" ] && ARGS+=(--skip-files "$SKIP_FILES")
 

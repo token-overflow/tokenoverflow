@@ -28,6 +28,8 @@ resource "aws_security_group" "bastion" {
   }
 }
 
+# TODO(#156): https://github.com/token-overflow/tokenoverflow/issues/156
+# trivy:ignore:AWS-0104
 resource "aws_vpc_security_group_egress_rule" "all_outbound" {
   security_group_id = aws_security_group.bastion.id
   description       = "Allow all outbound traffic (SSM agent, DB access)"
