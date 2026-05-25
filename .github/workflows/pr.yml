@@ -150,6 +150,11 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       (needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.docker == 'true' ||
        needs.prepare.outputs.workflows == 'true')
+    # Job-level permissions override the workflow-level ceiling so the called
+    # reusable can declare `packages: write` without it being capped to `none`.
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/docker_build.yml
     secrets: inherit
 
