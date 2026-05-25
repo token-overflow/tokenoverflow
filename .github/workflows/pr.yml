@@ -142,9 +142,20 @@ jobs:
       docker: ${{ needs.prepare.outputs.docker == 'true' || needs.prepare.outputs.workflows == 'true' }}
     secrets: inherit
 
+  # Fork PRs cannot write to GHCR; the fork guard skips this job entirely.
+  # The required aggregator exempts docker_build on forks.
+  docker_build:
+    needs: [ prepare, lint, type_check, unit_test, integration_test, security_audit ]
+    if: |
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.docker == 'true' ||
+       needs.prepare.outputs.workflows == 'true')
+    uses: ./.github/workflows/docker_build.yml
+    secrets: inherit
+
   required:
     name: Required
-    needs: [ prepare, lint, type_check, unit_test, integration_test, security_audit ]
+    needs: [ prepare, lint, type_check, unit_test, integration_test, security_audit, docker_build ]
     if: always()
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
@@ -165,5 +176,9 @@ jobs:
            needs.integration_test.result != 'success') ||
           ((needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.ts == 'true' ||
             needs.prepare.outputs.docker == 'true' || needs.prepare.outputs.workflows == 'true') &&
-           needs.security_audit.result != 'success')
+           needs.security_audit.result != 'success') ||
+          (github.event.pull_request.head.repo.full_name == github.repository &&
+           (needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.docker == 'true' ||
+            needs.prepare.outputs.workflows == 'true') &&
+           needs.docker_build.result != 'success')
         run: exit 1
