@@ -26,9 +26,21 @@ function test_redeploy_local_calls_compose_down() {
   assert_contains "docker compose down -v" "$TOKENOVERFLOW_MOCK_LOG"
 }
 
-function test_redeploy_local_calls_compose_up() {
+function test_redeploy_local_calls_compose_up_with_all_profiles() {
   redeploy_local
-  assert_contains "docker compose up -d" "$TOKENOVERFLOW_MOCK_LOG"
+  assert_contains \
+    "docker compose --profile api --profile landing --profile web up -d --build --wait" \
+    "$TOKENOVERFLOW_MOCK_LOG"
+}
+
+function test_redeploy_local_compose_up_uses_build_flag() {
+  redeploy_local
+  assert_contains "up -d --build" "$TOKENOVERFLOW_MOCK_LOG"
+}
+
+function test_redeploy_local_compose_up_uses_wait_flag() {
+  redeploy_local
+  assert_contains "--wait" "$TOKENOVERFLOW_MOCK_LOG"
 }
 
 function test_redeploy_local_calls_health_check() {
@@ -42,7 +54,7 @@ function test_redeploy_local_executes_in_correct_order() {
   # Verify order: down before up before curl
   local down_pos up_pos curl_pos
   down_pos=$(echo "$TOKENOVERFLOW_MOCK_LOG" | grep -bo "compose down" | head -1 | cut -d: -f1)
-  up_pos=$(echo "$TOKENOVERFLOW_MOCK_LOG" | grep -bo "compose up" | head -1 | cut -d: -f1)
+  up_pos=$(echo "$TOKENOVERFLOW_MOCK_LOG" | grep -bo "compose --profile" | head -1 | cut -d: -f1)
   curl_pos=$(echo "$TOKENOVERFLOW_MOCK_LOG" | grep -bo "curl" | head -1 | cut -d: -f1)
 
   assert_equals "true" "$([ "$down_pos" -lt "$up_pos" ] && echo true || echo false)"

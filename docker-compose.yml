@@ -1,12 +1,17 @@
 # TokenOverflow Local Development Environment
 #
-# Usage:
-#   docker compose up -d --build --wait
+# Services are gated behind profiles, so a bare `docker compose up` boots
+# nothing. Use `redeploy_local` (from `scripts/src/includes.sh`) to boot the
+# full stack, or pick a profile explicitly:
+#   docker compose --profile api up -d --build --wait      # api leg
+#   docker compose --profile landing up -d --build --wait  # landing leg
+#   docker compose --profile web up -d --build --wait      # full stack
 
 services:
   postgres:
     image: pgvector/pgvector:0.8.2-pg18
     container_name: tokenoverflow_db
+    profiles: [api, web]
     environment:
       POSTGRES_USER: tokenoverflow
       POSTGRES_PASSWORD: localdev
@@ -25,6 +30,7 @@ services:
     build:
       context: .
       dockerfile: infra/docker/diesel/Dockerfile
+    profiles: [api, web]
     working_dir: /volume
     volumes:
       - ./apps/api:/volume
@@ -38,6 +44,7 @@ services:
   pgbouncer:
     image: edoburu/pgbouncer:latest
     container_name: tokenoverflow_pgbouncer
+    profiles: [api, web]
     ports:
       - "6432:6432"
     environment:
@@ -59,7 +66,9 @@ services:
     build:
       context: .
       dockerfile: apps/embedding_service/Dockerfile
+    image: ghcr.io/${TOKENOVERFLOW_IMAGE_REPO:-tokenoverflow/tokenoverflow}/embedding_service:${TOKENOVERFLOW_IMAGE_TAG:-latest}
     container_name: tokenoverflow_embeddings
+    profiles: [api, web]
     ports:
       - "3001:8080"
     environment:
@@ -79,7 +88,9 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+    image: ghcr.io/${TOKENOVERFLOW_IMAGE_REPO:-tokenoverflow/tokenoverflow}/api:${TOKENOVERFLOW_IMAGE_TAG:-latest}
     container_name: tokenoverflow_api
+    profiles: [api, web]
     ports:
       - "8080:8080"
     environment:
@@ -107,7 +118,9 @@ services:
     build:
       context: .
       dockerfile: apps/landing/Dockerfile
+    image: ghcr.io/${TOKENOVERFLOW_IMAGE_REPO:-tokenoverflow/tokenoverflow}/landing:${TOKENOVERFLOW_IMAGE_TAG:-latest}
     container_name: tokenoverflow_landing
+    profiles: [landing]
     ports:
       - "4321:4321"
     environment:
@@ -123,7 +136,9 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+    image: ghcr.io/${TOKENOVERFLOW_IMAGE_REPO:-tokenoverflow/tokenoverflow}/web:${TOKENOVERFLOW_IMAGE_TAG:-latest}
     container_name: tokenoverflow_web
+    profiles: [web]
     ports:
       - "3000:3000"
     environment:

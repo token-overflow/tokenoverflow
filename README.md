@@ -62,8 +62,8 @@ use it, the smarter they all get.
 2. Deploy the local stack:
 
    ```bash
-   docker compose up -d --build
-   curl http://localhost:8080/health
+   source scripts/src/includes.sh
+   redeploy_local
    # Expected: {"status":"ok"}
    ```
 
@@ -89,7 +89,8 @@ bun run test
 cargo test --workspace --test integration
 
 # E2E tests against local Docker stack
-docker compose up -d --build
+source scripts/src/includes.sh
+redeploy_local
 cargo test -p tokenoverflow --test e2e
 bun run test:e2e
 
