@@ -20,10 +20,10 @@
       "persistent": true
     },
     "check": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build", "gen:api-client"]
     },
     "lint": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build", "gen:api-client"]
     },
     "lint:css": {},
     "format:check": {},
@@ -33,11 +33,11 @@
       "dependsOn": ["build"]
     },
     "test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "gen:api-client"],
       "outputs": []
     },
     "test:coverage": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "gen:api-client"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "!tests/e2e/**",
