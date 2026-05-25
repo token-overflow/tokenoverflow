@@ -69,7 +69,7 @@ function test_joins_multiple_ignored_dirs_with_commas() {
   assert_contains "," "$output"
 }
 
-function test_ignores_file_only_gitignore_entries() {
+function test_passes_file_only_gitignore_entries_via_skip_files() {
   printf '.DS_Store\nbuild/\n' >.gitignore
   touch .DS_Store
   mkdir build
@@ -78,7 +78,7 @@ function test_ignores_file_only_gitignore_entries() {
   git commit -q -m init
   local output
   output="$("$HOOK_SCRIPT")"
-  assert_same "trivy fs --disable-telemetry --exit-code 1 --severity=HIGH,CRITICAL --skip-dirs build ." "$output"
+  assert_same "trivy fs --disable-telemetry --exit-code 1 --severity=HIGH,CRITICAL --skip-dirs build --skip-files .DS_Store ." "$output"
 }
 
 function test_handles_nested_ignored_dirs() {
