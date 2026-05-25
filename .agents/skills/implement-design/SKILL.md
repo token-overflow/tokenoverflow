@@ -80,8 +80,6 @@ checks pass. Do not run it for incremental feedback.
 ```shell
 # Make sure .gitignore is up-to-date! Stage everything (only at the end).
 git add --all
-# Bring up the full local stack for e2e.
-docker compose up -d --build --wait
 # Run pre-commit ONCE; capture full output to /tmp/prek.log.
 prek run --verbose > /tmp/prek.log 2>&1
 echo "exit: $?"
@@ -98,5 +96,4 @@ checklist:
 - [ ] There are no unit, integration, or end-to-end test gaps.
 
 **!!!CRITICAL!!!** Your work is not done until every single pre-commit hook
-passes, even the ones that are not relevant to your changes! E2E tests
-require the full docker environment running, DON'T skip it!
+passes, even the ones that are not relevant to your changes!
