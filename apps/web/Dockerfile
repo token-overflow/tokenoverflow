@@ -38,6 +38,8 @@ WORKDIR /app
 # no need to ship node_modules.
 COPY --from=builder /app/apps/web/.output ./.output
 
+USER node
+
 EXPOSE 3000
 
 CMD ["node", ".output/server/index.mjs"]

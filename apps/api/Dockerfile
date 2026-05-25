@@ -5,7 +5,7 @@ FROM --platform=linux/arm64 rust:1.93-slim AS chef
 WORKDIR /app
 
 # Install build dependencies needed for cargo-chef and compilation
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     libssl-dev \
     libpq-dev \
@@ -58,7 +58,7 @@ RUN strip /app/target/release/tokenoverflow
 # =============================================================================
 FROM --platform=linux/arm64 debian:trixie-slim AS runtime
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libssl3 \
     libpq5 \

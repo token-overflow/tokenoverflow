@@ -42,7 +42,7 @@ function test_passes_through_when_no_ignored_dirs_exist() {
   git commit -q -m init
   local output
   output="$("$HOOK_SCRIPT")"
-  assert_same "trivy fs --disable-telemetry --exit-code 1 --severity=HIGH,CRITICAL ." "$output"
+  assert_same "trivy fs --disable-telemetry --exit-code 1 --severity=HIGH,CRITICAL --scanners=vuln,secret,misconfig ." "$output"
 }
 
 function test_includes_single_ignored_dir() {
@@ -53,7 +53,7 @@ function test_includes_single_ignored_dir() {
   git commit -q -m init
   local output
   output="$("$HOOK_SCRIPT")"
-  assert_same "trivy fs --disable-telemetry --exit-code 1 --severity=HIGH,CRITICAL --skip-dirs build ." "$output"
+  assert_same "trivy fs --disable-telemetry --exit-code 1 --severity=HIGH,CRITICAL --scanners=vuln,secret,misconfig --skip-dirs build ." "$output"
 }
 
 function test_joins_multiple_ignored_dirs_with_commas() {
@@ -78,7 +78,7 @@ function test_passes_file_only_gitignore_entries_via_skip_files() {
   git commit -q -m init
   local output
   output="$("$HOOK_SCRIPT")"
-  assert_same "trivy fs --disable-telemetry --exit-code 1 --severity=HIGH,CRITICAL --skip-dirs build --skip-files .DS_Store ." "$output"
+  assert_same "trivy fs --disable-telemetry --exit-code 1 --severity=HIGH,CRITICAL --scanners=vuln,secret,misconfig --skip-dirs build --skip-files .DS_Store ." "$output"
 }
 
 function test_handles_nested_ignored_dirs() {

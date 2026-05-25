@@ -10,6 +10,8 @@ resource "aws_security_group" "lambda" {
   }
 }
 
+# TODO(#156): https://github.com/token-overflow/tokenoverflow/issues/156
+# trivy:ignore:AWS-0104
 resource "aws_vpc_security_group_egress_rule" "lambda_all_outbound" {
   security_group_id = aws_security_group.lambda.id
   description       = "Allow all outbound traffic"
