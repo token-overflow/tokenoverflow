@@ -30,6 +30,7 @@ services:
     build:
       context: .
       dockerfile: infra/docker/diesel/Dockerfile
+    image: ghcr.io/${TOKENOVERFLOW_IMAGE_REPO:-tokenoverflow/tokenoverflow}/migrations:${TOKENOVERFLOW_IMAGE_TAG:-latest}
     profiles: [api, web]
     working_dir: /volume
     volumes:
@@ -120,7 +121,7 @@ services:
       dockerfile: apps/landing/Dockerfile
     image: ghcr.io/${TOKENOVERFLOW_IMAGE_REPO:-tokenoverflow/tokenoverflow}/landing:${TOKENOVERFLOW_IMAGE_TAG:-latest}
     container_name: tokenoverflow_landing
-    profiles: [landing]
+    profiles: [landing, web]
     ports:
       - "4321:4321"
     environment:

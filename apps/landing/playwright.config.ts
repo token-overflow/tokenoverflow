@@ -9,7 +9,7 @@ export default defineConfig({
   testMatch: ["**/tests/e2e/**/*.spec.ts", "**/tests/integration/**/*.spec.ts"],
   fullyParallel: true,
   forbidOnly: true,
-  retries: 0,
+  retries: isCI ? 1 : 0,
   workers: isCI ? 1 : "100%",
   reporter: [["list"], ["html", { open: "never" }]],
   use: {

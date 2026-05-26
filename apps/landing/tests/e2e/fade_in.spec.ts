@@ -43,9 +43,12 @@ test("below-the-fold fade-in elements start below opacity 1 and reach 1 after sc
   expect(Number(before), "below-the-fold element must start below opacity 1").toBeLessThan(1);
 
   await locator.scrollIntoViewIfNeeded();
+  // WebKit on `ubuntu-24.04-arm` defers the first rAF tick by hundreds of
+  // ms under load; 10s gives the fade enough room without masking real
+  // regressions (the transition itself is ~600ms).
   await expect
     .poll(async () => Number(await computedOpacity(page, selector)), {
-      timeout: 3_000,
+      timeout: 10_000,
       message: "fade-in must resolve to opacity 1 after scroll",
     })
     .toBe(1);

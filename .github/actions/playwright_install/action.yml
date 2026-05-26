@@ -27,14 +27,25 @@ runs:
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
       with:
         path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ inputs.app }}-${{ hashFiles('bun.lock') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-playwright-v2-${{ inputs.app }}-${{ hashFiles('bun.lock') }}
         restore-keys: |
-          ${{ runner.os }}-${{ runner.arch }}-playwright-${{ inputs.app }}-
+          ${{ runner.os }}-${{ runner.arch }}-playwright-v2-${{ inputs.app }}-
 
-    # `--with-deps` is the supported way to install OS packages Playwright needs.
+    # OS deps live outside the cached `~/.cache/ms-playwright` tree, so the
+    # cache restore brings back browser binaries but not their shared libs
+    # (e.g. libwoff2dec for WebKit). Install OS deps every run; install
+    # browser binaries only on cache miss.
+    - name: Install Playwright OS deps
+      shell: bash
+      env:
+        INPUT_APP: ${{ inputs.app }}
+      working-directory: apps/${{ inputs.app }}
+      run: bunx playwright install-deps
+
     - name: Install Playwright browsers
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
       env:
         INPUT_APP: ${{ inputs.app }}
-      run: bunx "--filter=@tokenoverflow/${INPUT_APP}" playwright install --with-deps
+      working-directory: apps/${{ inputs.app }}
+      run: bunx playwright install
