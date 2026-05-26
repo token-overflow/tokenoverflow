@@ -1,0 +1,27 @@
+name: Prune PR Cache
+
+on:
+  pull_request:
+    types: [ closed ]
+
+# Idempotent delete: never cancel an in-flight prune mid-loop.
+concurrency:
+  group: prune-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  prune_pr_cache:
+    name: Prune PR Cache
+    # Fork PRs never wrote `:pr-N` tags (docker_build is same-repo only).
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 5
+    steps:
+      - uses: dataaxiom/ghcr-cleanup-action@f092b48ba3b604b2a83690dc4b2bbb3392e1045f  # v1.2.1
+        with:
+          packages: api,embedding_service,landing,web,migrations
+          delete-tags: pr-${{ github.event.pull_request.number }}
