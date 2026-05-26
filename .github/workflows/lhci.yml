@@ -16,6 +16,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
+      # Astro shells out via Node and enforces Node >= 22.12.
+      # `ubuntu-24.04-arm` ships Node 20 by default.
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: '22'
+
       - name: Install Bun & dependencies
         uses: ./.github/actions/bun_install
 
