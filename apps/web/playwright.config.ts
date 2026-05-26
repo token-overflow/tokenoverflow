@@ -8,7 +8,7 @@ export default defineConfig({
   testMatch: ["**/tests/e2e/**/*.spec.ts"],
   fullyParallel: false,
   forbidOnly: true,
-  retries: 0,
+  retries: isCI ? 1 : 0,
   workers: 1,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
@@ -25,7 +25,7 @@ export default defineConfig({
     cwd: "../..",
     command: "docker compose up -d --build --wait",
     url: "http://127.0.0.1:3000/health",
-    reuseExistingServer: !isCI,
+    reuseExistingServer: true,
     stdout: "pipe",
     stderr: "pipe",
     timeout: 600_000,

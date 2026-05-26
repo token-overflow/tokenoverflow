@@ -75,11 +75,12 @@ test("animation is running: two frames 300ms apart differ", async ({ page }) => 
     )
     .not.toBe("0");
   expect(frameA.length, "canvas must produce pixel data").toBeGreaterThan(0);
-  // Allow up to 2 seconds; 300ms is the happy path but a busy CI VM may
-  // drop frames and defer the first rAF tick well past that mark.
+  // 300ms is the happy path; WebKit on `ubuntu-24.04-arm` can defer the
+  // first rAF tick by several seconds under load, so 10s gives the loop
+  // enough room without masking real regressions.
   await expect
     .poll(async () => await sample(), {
-      timeout: 2_000,
+      timeout: 10_000,
       message: "ASCII canvas must animate: pixel digest must change",
     })
     .not.toBe(frameA);

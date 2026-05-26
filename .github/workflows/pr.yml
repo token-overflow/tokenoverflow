@@ -76,6 +76,7 @@ jobs:
             docker:
               - 'docker-compose.yml'
               - 'apps/*/Dockerfile'
+              - 'infra/docker/**'
             workflows:
               - '.github/workflows/**'
               - '.github/actions/**'

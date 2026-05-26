@@ -71,11 +71,11 @@ jobs:
 
       - name: Run landing e2e
         if: matrix.app == 'landing' && env.ACT != 'true'
-        run: bun run --filter=@tokenoverflow/landing test:e2e
+        run: bun run turbo run test:e2e --filter=@tokenoverflow/landing
 
       - name: Run web e2e
         if: matrix.app == 'web' && env.ACT != 'true'
-        run: bun run --filter=@tokenoverflow/web test:e2e
+        run: bun run turbo run test:e2e --filter=@tokenoverflow/web
 
       # Without `dest:` the action streams logs to stdout for inline UI debugging.
       - name: Stream Docker logs to stdout

@@ -16,7 +16,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [api, embedding_service, landing, web]
+        include:
+          - image: api
+            dockerfile: apps/api/Dockerfile
+          - image: embedding_service
+            dockerfile: apps/embedding_service/Dockerfile
+          - image: landing
+            dockerfile: apps/landing/Dockerfile
+          - image: web
+            dockerfile: apps/web/Dockerfile
+          - image: migrations
+            dockerfile: infra/docker/diesel/Dockerfile
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -47,7 +57,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6.19.2
         with:
           context: .
-          file: apps/${{ matrix.image }}/Dockerfile
+          file: ${{ matrix.dockerfile }}
           platforms: linux/arm64
           push: true
           tags: |
