@@ -65,7 +65,7 @@
         "!*.md"
       ],
       "outputs": [".lighthouseci/**"],
-      "env": ["CI"]
+      "env": ["CI", "CHROME_PATH"]
     }
   }
 }

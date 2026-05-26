@@ -38,8 +38,9 @@ jobs:
           app: landing
 
       # chrome-launcher (used by LHCI) honors `$CHROME_PATH` ahead of any
-      # auto-detection, so exporting it here is enough to redirect Lighthouse
-      # at Playwright's Chrome for Testing binary.
+      # auto-detection. Turbo's strict env mode requires this var to be
+      # declared on the `test:lhci` task in `turbo.json` for the script to
+      # see it.
       - name: Resolve CHROME_PATH
         if: env.ACT != 'true'
         working-directory: apps/landing
