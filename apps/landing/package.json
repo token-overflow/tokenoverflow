@@ -16,7 +16,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:lhci": "cd ../.. && lhci autorun --config=.lighthouserc.json"
+    "test:lhci": "cd ../.. && lhci autorun"
   },
   "dependencies": {
     "@astrojs/sitemap": "3.7.2",
