@@ -26,10 +26,8 @@ jobs:
       - name: Install Bun & dependencies
         uses: ./.github/actions/bun_install
 
-      - name: Build landing
-        if: env.ACT != 'true'
-        run: bun run --filter=@tokenoverflow/landing build
-
+      # Turbo's `test:lhci` task has `dependsOn: ["^build", "build"]`, so this
+      # one invocation builds the workspace deps + landing, then runs LHCI.
       - name: Run Lighthouse CI
         if: env.ACT != 'true'
-        run: bun run --filter=@tokenoverflow/landing test:lhci
+        run: bun run turbo run test:lhci --filter=@tokenoverflow/landing
