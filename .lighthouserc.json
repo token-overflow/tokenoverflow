@@ -7,6 +7,7 @@
       ],
       "numberOfRuns": 1,
       "settings": {
+        "chromeFlags": "--no-sandbox",
         "formFactor": "desktop",
         "screenEmulation": {
           "mobile": false,
