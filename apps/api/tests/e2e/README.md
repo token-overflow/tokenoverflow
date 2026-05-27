@@ -23,3 +23,10 @@ redeploy_local
 # Run integration tests
 cargo test -p tokenoverflow --test e2e
 ```
+
+## CI
+
+The api e2e suite is exercised in CI via
+[`.github/workflows/e2e_test.yml`](../../../../.github/workflows/e2e_test.yml).
+Locally, run `cargo test --test e2e -- --test-threads=1` against an up `api`
+profile stack.

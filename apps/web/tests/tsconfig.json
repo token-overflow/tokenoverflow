@@ -8,6 +8,7 @@
     "./unit/**/*.ts",
     "./integration/**/*.ts",
     "./e2e/**/*.ts",
+    "./global_setup.ts",
     "../src/**/*.ts"
   ],
   "exclude": ["../src/utils/api/_generated/**"]
