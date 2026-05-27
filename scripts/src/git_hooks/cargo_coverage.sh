@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Runs coverage for all workspace members across all test tiers.
+# Runs coverage for unit and integration tiers across all workspace members.
+# E2E coverage is enforced in CI via e2e_test.yml.
 # Requires: cargo-llvm-cov (installed via setup_cargo_tools)
 # Requires: Docker running for testcontainers (integration tests)
-# Requires: Docker Compose services running for e2e tests (docker compose up -d --build api)
 
 set -euo pipefail
 
@@ -19,5 +19,5 @@ fi
 
 cargo +nightly llvm-cov \
     --workspace \
-    --lib --test unit --test integration --test e2e \
+    --lib --test unit --test integration \
     --fail-under-lines "${REQUIRED_COVERAGE}"

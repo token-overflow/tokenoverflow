@@ -16,7 +16,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-PRIVATE_KEY_PATH="$PROJECT_ROOT/apps/api/tests/assets/auth/test_private_key.pem"
+# `TOKENOVERFLOW_PRIVATE_KEY_PATH` is a test-injection override -- lets tests
+# point at a missing path to exercise the not-found branch.
+PRIVATE_KEY_PATH="${TOKENOVERFLOW_PRIVATE_KEY_PATH:-$PROJECT_ROOT/apps/api/tests/assets/auth/test_private_key.pem}"
 CONFIG_PATH="$PROJECT_ROOT/apps/api/config/local.toml"
 
 # Defaults
