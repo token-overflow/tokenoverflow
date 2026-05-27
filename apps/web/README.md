@@ -2,6 +2,13 @@
 
 The web BFF (Backend for Frontend).
 
+## E2E tests
+
+`bun run --filter=@tokenoverflow/web test:e2e` requires the local docker
+stack to be up. Run `redeploy_local` first (or
+`docker compose --profile web up -d --wait`). The Playwright config bails
+early with a helpful message if port `3000` is not listening.
+
 ## Waitlist OAuth flow
 
 The BFF is a confidential WorkOS client (`TokenOverflow Web`,
