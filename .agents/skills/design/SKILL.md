@@ -41,8 +41,8 @@ You **must** follow the steps below:
 10. Once all key decisions are made, fill out the entire design document. Make
     sure to follow the template style, format, and rule.
 11. If a PRD was provided, make sure all its requirements are now satisfied.
-12. Get a review from the `design-reviewer` subagent. For each finding, ask the
-    user's approval.
+12. Get a review from three `design-reviewer` subagents in parallel. For each
+    finding, ask for the user's approval.
 13. Once done, ask for a review from the user, and keep iterating until you get
  approval.
 

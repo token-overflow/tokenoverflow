@@ -17,20 +17,22 @@ fast local feedback checks.
   filters and reusable workflows.
 - Add reusable workflows for lint, type check, unit, integration, security,
   Docker build, e2e, and LHCI.
-- Add `prune_pr_cache.yml` to delete PR image tags from GHCR when a PR closes.
-- Add `tag_main_cache.yml` to retag latest `:sha` images as `:main` on
-  `push: main`.
+- Add `prune_pr_cache.yml` to delete PR image and cache tags from GHCR when a
+  PR closes.
+- Make `docker_build.yml` self-fire on `push: main` (image-affecting paths) so
+  the long-lived `:buildcache` refreshes without a separate retag sidecar.
 - Add composite actions for Bun install, Rust toolchain, Docker Compose startup,
   and Playwright install.
 - Add one `required` aggregator job in `pr.yml` as the only branch-protection
   status check.
 - Add path filters so docs-only PRs skip CI work and still pass.
 - Build `api`, `embedding_service`, `landing`, and `web` images to GHCR with
-  `:sha` and `:pr-N` tags.
-- Configure BuildKit to read from `:main` and `:pr-N`, and write `:pr-N` only
-  for non-fork PRs.
-- Run e2e with an `api`, `landing`, and `web` matrix using the published `:sha`
-  images.
+  `:pr-N` tags on PR builds and `:main` on `push: main`. No SHA image tags.
+- Configure BuildKit to read from `:buildcache` + `:buildcache-pr-N`, and
+  write `:buildcache-pr-N` (PRs) or `:buildcache` (`push: main`) only for
+  non-fork events.
+- Run e2e with an `api`, `landing`, and `web` matrix pulling the `:pr-N` images
+  published by `docker_build`.
 - Add a reusable LHCI workflow for the landing app.
 - Align Compose profiles to e2e legs and reuse the existing `redeploy_local`
   helper to boot the full stack.
@@ -238,11 +240,13 @@ fast local feedback checks.
 
 ### How does e2e get Docker images?
 
-#### ✅ Option 1: GHCR :sha + compose pull
+#### ✅ Option 1: GHCR :pr-N + compose pull
 
-- Description: docker_build pushes `:sha`; e2e runs `docker compose pull` +
-  `up -d --no-build --wait`.
-- Pros: Plain Compose semantics; no artifact-size limits.
+- Description: docker_build pushes `:pr-N`; e2e runs `docker compose pull` +
+  `up -d --no-build --wait` against the same tag.
+- Pros: Plain Compose semantics; no artifact-size limits; tag is stable within
+  a workflow run (orchestrator-level `cancel-in-progress` removes the stale-tag
+  race).
 - Cons: One extra registry round trip per leg.
 - Rationale: Native and simple.
 
@@ -263,13 +267,16 @@ fast local feedback checks.
 
 ### BuildKit cache layout?
 
-#### ✅ Option 1: Hybrid main + pr-N
+#### ✅ Option 1: Hybrid `:buildcache` + `:buildcache-pr-N`
 
-- Description: `cache-from = :main + :pr-N`; `cache-to = :pr-N,mode=max`.
-  `:main` refreshed by `tag_main_cache.yml`.
-- Pros: Warm baseline plus PR-local writes.
-- Cons: Two tag families to manage.
-- Rationale: Best cache hit rate without baseline pollution.
+- Description: Cache tags live alongside image tags but never overlap.
+  `cache-from = :buildcache + :buildcache-pr-N`. PR runs write
+  `cache-to = :buildcache-pr-N,mode=max`; `push: main` runs write
+  `cache-to = :buildcache,mode=max`. No separate retag workflow.
+- Pros: Warm baseline plus PR-local writes; one workflow owns both paths.
+- Cons: PR cache is per-PR (a brand-new branch starts from `:buildcache` only).
+- Rationale: Best cache hit rate without baseline pollution; survives multiple
+  pushes on the same PR (which cargo-chef + Rust monorepos benefit from most).
 
 #### ❌ Option 2: type=gha
 
@@ -290,6 +297,41 @@ fast local feedback checks.
 - Description: No shared baseline.
 - Pros: Isolated.
 - Cons: Cold cache on every new PR.
+- Rationale: Rejected.
+
+### Cache lifecycle: separate image vs cache tags?
+
+#### ✅ Option 1: Dedicated cache tags (`:buildcache`, `:buildcache-pr-N`)
+
+- Description: Image tags (`:pr-N`, `:main`) carry the deployable manifest;
+  cache tags (`:buildcache`, `:buildcache-pr-N`) carry the intermediate
+  BuildKit layers. The PR-local cache tag survives multiple pushes on the
+  same PR; the main cache tag is overwritten by every `push: main` build.
+  `prune_pr_cache.yml` drops both `:pr-N` and `:buildcache-pr-N` on PR close,
+  and sweeps untagged digests left behind by overwrites.
+- Pros: cargo-chef + Rust monorepo benefits from a writable PR-local cache
+  across follow-up commits; `e2e_test.yml` pulls the stable `:pr-N` tag.
+- Cons: Two tag families per image instead of one.
+- Rationale: The mainstream "PR reads from main only" pattern wastes the
+  warm dep-graph state that the second push to the same PR would otherwise
+  hit.
+
+#### ❌ Option 2: PR reads from `:main` only
+
+- Description: No per-PR cache; PRs read `:main` and re-export nothing.
+- Pros: One cache tag per image.
+- Cons: Follow-up pushes on the same PR get no cache improvement; dep-changing
+  PRs pay the cargo-chef rebuild cost on every push.
+- Rationale: Rejected; the per-PR cache is the whole reason we accepted two
+  tag families.
+
+#### ❌ Option 3: Reuse image tags as cache tags
+
+- Description: `cache-to: type=registry,ref=:pr-N` (cache and image share a
+  tag).
+- Pros: One tag per use case.
+- Cons: Cache mode `max` writes intermediate layers under the same name as
+  the deployable image; e2e cannot pull a clean artifact.
 - Rationale: Rejected.
 
 ### Bun cache?
@@ -542,13 +584,19 @@ fast local feedback checks.
 
 ### Cache prune lifecycle?
 
-#### ✅ Option 1: Two sidecars
+#### ✅ Option 1: One sidecar + self-firing main build
 
-- Description: `prune_pr_cache.yml` on PR close deletes `:pr-N`.
-  `tag_main_cache.yml` on push:main retags `:sha` to `:main`.
-- Pros: One concern per file.
-- Cons: Two workflow files.
-- Rationale: Mixing them muddies triggers.
+- Description: `prune_pr_cache.yml` on PR close deletes both `:pr-N` and
+  `:buildcache-pr-N` and sweeps untagged digests across all five packages.
+  `:buildcache` is refreshed by `docker_build.yml`'s own `push: main`
+  trigger (no separate retag workflow).
+- Pros: One concern per file; untagged sweep keeps GHCR bounded as `:main`
+  and `:pr-N` get overwritten.
+- Cons: A push that misses the docker path filter leaves `:buildcache`
+  stale, but only the next dep-changing PR pays for it. Untagged cleanup
+  is bounded by PR-close cadence.
+- Rationale: Removing the retag sidecar simplified the lifecycle without
+  losing cache freshness.
 
 #### ❌ Option 2: Keep all PR tags
 
@@ -564,19 +612,23 @@ fast local feedback checks.
 - Cons: Lags PR close.
 - Rationale: Rejected.
 
-#### ❌ Option 4: Single sidecar
+#### ❌ Option 4: Separate retag sidecar (`tag_main_cache.yml`)
 
-- Description: One workflow for both.
-- Pros: Fewer files.
-- Cons: Mixes triggers and concerns.
-- Rationale: Rejected.
+- Description: Original v0 plan. A second workflow on `push: main` retagged
+  the merge-commit `:sha` image as `:main`.
+- Pros: Cheap (manifest copy only).
+- Cons: SHA-mismatch risk: the retag workflow uses `github.sha` (merge
+  commit) while PR runs publish under the PR `head.sha`; if a non-image
+  push slips in between, the retag has no fresh `:sha` to copy.
+- Rationale: Rejected; replaced by `docker_build.yml`'s own `push: main`
+  trigger which always rebuilds from source.
 
-### Build all 4 images or matrix-conditional?
+### Build all 5 images or matrix-conditional?
 
-#### ✅ Option 1: Always build all 4
+#### ✅ Option 1: Always build all 5
 
-- Description: Unconditional matrix `[api, embedding_service, landing, web]`.
-- Pros: Stable `:sha` set for e2e profiles; cargo-chef + BuildKit make unchanged
+- Description: Unconditional matrix `[api, embedding_service, landing, web, migrations]`.
+- Pros: Stable `:pr-N` set for e2e profiles; cargo-chef + BuildKit make unchanged
   rebuilds ~30s.
 - Cons: Slightly more runner time on TS-only PRs.
 - Rationale: YAML complexity for marginal savings is not worth it.
@@ -585,7 +637,7 @@ fast local feedback checks.
 
 - Description: Build only changed surfaces.
 - Pros: Less compute.
-- Cons: E2E pull contract breaks when a needed `:sha` does not exist.
+- Cons: E2E pull contract breaks when a needed `:pr-N` does not exist.
 - Rationale: Rejected.
 
 ### How are e2e Docker logs captured?
@@ -664,12 +716,13 @@ fast local feedback checks.
               |  +---------+                |
               +-----------------------------+
 
-              pull_request: closed                push: main
+              pull_request: closed              push: main (image paths)
                             |                          |
                             v                          v
                 +---------------------+    +-----------------------+
-                | prune_pr_cache.yml  |    |  tag_main_cache.yml   |
-                |  delete :pr-N tags  |    |  retag :sha as :main  |
+                | prune_pr_cache.yml  |    |   docker_build.yml    |
+                |  delete :pr-N and   |    |  rebuild + push :main |
+                |  :buildcache-pr-N   |    |  + refresh :buildcache|
                 +---------------------+    +-----------------------+
 
    Every reusable workflow consumes composite actions under .github/actions/.
@@ -691,6 +744,7 @@ SHA and comment in lockstep.
 | Rust cache                   | `Swatinem/rust-cache`         | Latest `v2` SHA. v2.9.1 (March 2026).                     |
 | BuildKit setup               | `docker/setup-buildx-action`  | Latest `v3` SHA.                                          |
 | Container registry login     | `docker/login-action`         | Latest `v3` SHA.                                          |
+| Container image metadata     | `docker/metadata-action`      | Latest `v6` SHA. Emits tags + labels for build-push.      |
 | Container image build + push | `docker/build-push-action`    | Latest `v6` SHA.                                          |
 | Path-filter change detection | `dorny/paths-filter`          | Re-use SHA (`v3.0.2`).                                    |
 | Playwright browsers install  | `bunx playwright install`     | Playwright's own CLI. No marketplace action.              |
@@ -719,11 +773,10 @@ SHA and comment in lockstep.
 │   ├── unit_test.yml                # reusable (multi-job)
 │   ├── integration_test.yml         # reusable
 │   ├── security_audit.yml           # reusable
-│   ├── docker_build.yml             # reusable
+│   ├── docker_build.yml             # reusable + on: push: main
 │   ├── e2e_test.yml                 # reusable
 │   ├── lhci.yml                     # reusable
 │   ├── prune_pr_cache.yml           # on: pull_request: closed
-│   ├── tag_main_cache.yml           # on: push: main
 │   ├── deploy_*.yml                 # modified (consume new composite actions)
 │   ├── terraform.yml                # unchanged
 │   └── CLAUDE.md                    # unchanged
@@ -818,17 +871,32 @@ Inputs: `rust`, `ts`, `docker`. Three parallel jobs: `trivy` (always;
 
 ### Reusable workflow: `docker_build.yml`
 
-Permissions: `contents: read`, `packages: write`. Matrix over
-`[api, embedding_service, landing, web]`. Each leg runs
-`docker/build-push-action` with tags `:sha` + `:pr-N`,
-`cache-from = :main + :pr-N`, `cache-to = :pr-N,mode=max` (skipped on forks).
+Permissions: `contents: read`, `packages: write`. Triggers: `workflow_call`
+(from `pr.yml`), `workflow_dispatch`, and `push: main` on the image-affecting
+path filter. Matrix over `[api, embedding_service, landing, web, migrations]`.
+Tags come from `docker/metadata-action`: `type=ref,event=pr` writes `:pr-N`
+on PR builds; `type=ref,event=branch` writes `:main` on `push: main`. No SHA
+image tags.
+
+Cache layout:
+
+- `cache-from`: `:buildcache` (always) plus `:buildcache-pr-N` on PR events
+  only, via an expression ternary. `push: main` and `workflow_dispatch` emit
+  no second ref, so `docker/build-push-action` only imports `:buildcache`.
+- `cache-to`: PR runs write `:buildcache-pr-N,mode=max`; `push: main` and
+  `workflow_dispatch` runs write `:buildcache,mode=max`.
+
+Push gate: `push: main`, `workflow_dispatch`, and same-repo PRs push to GHCR;
+fork PRs build but cannot push. Per-image concurrency group prevents two
+concurrent `push: main` builds from racing for the same `:buildcache` slot.
 Dockerfiles use cargo-chef; no host-built binary is fed in.
 
 ### Reusable workflow: `e2e_test.yml`
 
 Permissions: `contents: read`, `packages: read`. Matrix over
-`[api, landing, web]`. Each leg uses `docker_compose_up` to boot the
-corresponding profile, then runs:
+`[api, landing, web]`. Each leg uses `docker_compose_up` with
+`tag: pr-${{ github.event.pull_request.number || 'main' }}` to pull the image
+published by `docker_build`, then runs:
 
 - `api`: `cargo test --test e2e -- --test-threads=1`.
 - `landing`: `bun run --filter=@tokenoverflow/landing test:e2e`.
@@ -848,10 +916,13 @@ at repo root.
 
 ### Sidecar workflows
 
-- **`prune_pr_cache.yml`**: `on: pull_request: types: [closed]`. Deletes `:pr-N`
-  tags from GHCR for all four images.
-- **`tag_main_cache.yml`**: `on: push: branches: [main]`. Retags merge-commit
-  `:sha` images to `:main` via `docker buildx imagetools create`. ~30s total.
+- **`prune_pr_cache.yml`**: `on: pull_request: types: [closed]`. Deletes both
+  `:pr-N` and `:buildcache-pr-N` tags from GHCR for every image and sweeps
+  untagged digests (`delete-untagged: true`) so overwritten `:main` and
+  `:pr-N` versions do not accumulate.
+
+`docker_build.yml` doubles as the `:buildcache` refresh path via its own
+`push: main` trigger; no separate retag sidecar exists.
 
 ### Path-filter outputs (emitted by `prepare`)
 
@@ -863,7 +934,7 @@ at repo root.
 | `web`       | `apps/web/**`                                                                                                     |
 | `api`       | `apps/api/**`                                                                                                     |
 | `embedding` | `apps/embedding_service/**`                                                                                       |
-| `docker`    | `docker-compose.yml`, `apps/*/Dockerfile`                                                                         |
+| `docker`    | `apps/*/Dockerfile`, `infra/docker/**`                                                                            |
 | `workflows` | `.github/workflows/**`, `.github/actions/**`                                                                      |
 | `terraform` | `terraform/**`, `**/*.tf`, `**/*.tftpl`                                                                           |
 | `shell`     | `**/*.sh`, `scripts/**`                                                                                           |
@@ -925,13 +996,13 @@ booleans listed under Path-filter outputs.
   uses: dorny/paths-filter@<sha>
   with:
       filters: |
-          rust: ['apps/api/**', 'apps/embedding_service/**', 'apps/so_tag_sync/**', 'Cargo.toml', 'Cargo.lock']
-          ts: ['apps/web/**', 'apps/landing/**', 'packages/**', 'apps/api/openapi.json', 'bun.lock', 'bunfig.toml', 'turbo.json']
+          rust: ['apps/api/**', 'apps/embedding_service/**', 'apps/so_tag_sync/**', 'integrations/**', 'Cargo.toml', 'Cargo.lock']
+          ts: ['apps/web/**', 'apps/landing/**', 'packages/**', 'apps/api/openapi.json', 'package.json', 'bun.lock', 'bunfig.toml', 'turbo.json']
           landing: ['apps/landing/**']
           web: ['apps/web/**']
           api: ['apps/api/**']
           embedding: ['apps/embedding_service/**']
-          docker: ['docker-compose.yml', 'apps/*/Dockerfile']
+          docker: ['docker-compose.yml', 'apps/*/Dockerfile', 'infra/docker/**']
           workflows: ['.github/workflows/**', '.github/actions/**']
           terraform: ['terraform/**', '**/*.tf', '**/*.tftpl']
           shell: ['**/*.sh', 'scripts/**']
@@ -966,10 +1037,8 @@ job).
 | `tflint`                | `terraform`                                       |
 | `trivy`                 | `rust`, `ts`, or `docker`                         |
 | `lhci`                  | `landing`                                         |
-| `docker_build`          | `rust` or `docker`                                |
-| `e2e_test` api leg      | `api`, `embedding`, `docker`, or `openapi`        |
-| `e2e_test` landing leg  | `landing` or `docker`                             |
-| `e2e_test` web leg      | `web`, `api`, `embedding`, `docker`, or `openapi` |
+| `docker_build`          | `rust`, `ts`, or `docker`                         |
+| `e2e_test` (all legs)   | `rust`, `ts`, or `docker` (same-repo only)        |
 
 Dispatch pattern:
 
@@ -995,55 +1064,12 @@ lint:
 
 ### Required aggregator (in `pr.yml`)
 
-```yaml
-required:
-    needs:
-        [
-            prepare,
-            lint,
-            type_check,
-            unit_test,
-            integration_test,
-            security_audit,
-            lhci,
-            docker_build,
-            e2e_test,
-        ]
-    if: always()
-    runs-on: ubuntu-24.04-arm
-    steps:
-        - name: Fail if conditional jobs failed
-          if: |
-              ((needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.ts == 'true' ||
-                needs.prepare.outputs.shell == 'true' || needs.prepare.outputs.markdown == 'true' ||
-                needs.prepare.outputs.terraform == 'true' || needs.prepare.outputs.astro == 'true' ||
-                needs.prepare.outputs.openapi == 'true' || needs.prepare.outputs.workflows == 'true') &&
-               needs.lint.result != 'success') ||
-              ((needs.prepare.outputs.ts == 'true' || needs.prepare.outputs.workflows == 'true') &&
-               needs.type_check.result != 'success') ||
-              ((needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.ts == 'true' ||
-                needs.prepare.outputs.shell == 'true' || needs.prepare.outputs.workflows == 'true') &&
-               needs.unit_test.result != 'success') ||
-              ((needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.ts == 'true' ||
-                needs.prepare.outputs.workflows == 'true') &&
-               needs.integration_test.result != 'success') ||
-              ((needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.ts == 'true' ||
-                needs.prepare.outputs.docker == 'true' || needs.prepare.outputs.workflows == 'true') &&
-               needs.security_audit.result != 'success') ||
-              ((needs.prepare.outputs.landing == 'true' || needs.prepare.outputs.workflows == 'true') &&
-               needs.lhci.result != 'success') ||
-              (github.event.pull_request.head.repo.full_name == github.repository && (
-                ((needs.prepare.outputs.rust == 'true' || needs.prepare.outputs.docker == 'true') &&
-                 needs.docker_build.result != 'success') ||
-                ((needs.prepare.outputs.api == 'true' || needs.prepare.outputs.embedding == 'true' ||
-                  needs.prepare.outputs.landing == 'true' || needs.prepare.outputs.web == 'true' ||
-                  needs.prepare.outputs.docker == 'true' || needs.prepare.outputs.openapi == 'true') &&
-                 needs.e2e_test.result != 'success')
-              ))
-          run: exit 1
-```
-
-The fork-PR clause exempts `docker_build` and `e2e_test` (skipped by design).
+Source of truth is `.github/workflows/pr.yml` (see the `required` job). The
+aggregator gates each conditional job on the matching `*_needed` output from
+`prepare`, and forces an explicit failure when `prepare` itself does not
+succeed. `docker_build` and `e2e_test` fold the fork-PR guard into their
+`*_needed` outputs, so fork PRs skip both jobs and the aggregator stays
+green.
 
 ### Concurrency
 
@@ -1054,8 +1080,10 @@ The fork-PR clause exempts `docker_build` and `e2e_test` (skipped by design).
 `prune_pr_cache.yml`: group `prune-pr-${{ github.event.pull_request.number }}`,
 `cancel-in-progress: false` (idempotent delete).
 
-`tag_main_cache.yml`: group `tag-main-cache`, `cancel-in-progress: false` (each
-merge must refresh `:main`).
+`docker_build.yml`: job-level group keyed on `event_name`, `matrix.image`, and
+the PR number or ref. `cancel-in-progress: true` for PR runs (the orchestrator
+already cancels superseded runs); `false` for `push: main` and
+`workflow_dispatch` so each merge refreshes `:buildcache` for its image.
 
 ### Permissions (least privilege)
 
@@ -1071,7 +1099,6 @@ merge must refresh `:main`).
 | `docker_build.yml`     | `contents: read`, `packages: write` |
 | `e2e_test.yml`         | `contents: read`, `packages: read`  |
 | `prune_pr_cache.yml`   | `contents: read`, `packages: write` |
-| `tag_main_cache.yml`   | `contents: read`, `packages: write` |
 
 No `pull-requests: write`. No `id-token: write`. `secrets: inherit` from
 `pr.yml`; today only `GITHUB_TOKEN` is auto-injected. Fork PRs never receive
@@ -1102,7 +1129,6 @@ secrets; the fork cascade keeps secret-handling workflows unreachable.
 | `e2e_test (web)`               | 25      |
 | `required`                     | 5       |
 | `prune_pr_cache`               | 5       |
-| `tag_main_cache`               | 5       |
 
 `e2e_test (landing)` is longer because it runs four Playwright projects
 (chromium, firefox, webkit, webkit-mobile). Values are insurance; tune down
@@ -1118,10 +1144,19 @@ after two weeks of green data.
 - **Workflow-only change**: `workflows=true` triggers every reusable.
 - **Fork PR cascade**: `docker_build` and `e2e_test` skipped via fork guard;
   required aggregator exempts both.
-- **Compose `--no-build` guard**: prevents silent rebuild when `:sha` pull
-  fails. Local `redeploy_local` keeps the build behavior.
-- **GHCR cache image bloat**: `prune_pr_cache.yml` removes `:pr-N` on close;
-  `:main` refreshed by `tag_main_cache.yml`.
+- **Compose `--no-build` guard**: prevents silent rebuild when the `:pr-N`
+  pull fails. Local `redeploy_local` keeps the build behavior.
+- **GHCR cache image bloat**: `prune_pr_cache.yml` removes `:pr-N` and
+  `:buildcache-pr-N` on close and sweeps untagged digests across all five
+  packages; `:buildcache` and `:main` are overwritten by every image-affecting
+  `push: main` build of `docker_build.yml`.
+- **Cache-from fall-through on missing tag**: on the first push of a new PR
+  (or the first push after a PR is reopened), `:buildcache-pr-N` does not
+  exist yet. `docker/build-push-action` logs an import warning and falls
+  through to `:buildcache`; the run still proceeds.
+- **Bootstrap cold start**: the first PR after this lands runs without a
+  `:buildcache` baseline (cargo-chef rebuilds from scratch). The next
+  `push: main` populates `:buildcache` for every following PR.
 - **Docker Hub rate limit**: testcontainers pulls
   `pgvector/pgvector:0.8.2-pg18`. Limit is 200/6h/IP anonymous. Mitigations if
   tripped: GHCR mirror (preferred) or `DOCKERHUB_TOKEN` PAT.
@@ -1145,8 +1180,6 @@ after two weeks of green data.
 - **`bunx playwright install --with-deps` requires sudo**: GitHub runners allow
   passwordless sudo.
 - **e2e shares one Postgres**: api e2e runs `--test-threads=1`.
-- **Two concurrent merges**: serial `push: main` delivery +
-  `cancel-in-progress: false`. Last-written `:main` wins.
 - **Self-host runner fallback**: out of scope for v1.
 - **`cargo_coverage.sh` policy split**: pre-commit runs unit + integration; CI
   runs unit + integration + e2e in `e2e_test.yml`.
@@ -1172,9 +1205,11 @@ after two weeks of green data.
    `required` green.
 10. **WebKit risk validation**: first landing run, all four landing projects
     pass.
-11. **Prune workflow**: close a PR; `:pr-N` tags gone within minutes.
-12. **`:main` retag**: merge a PR;
-    `docker buildx imagetools inspect <image>:main` shows the merged digest.
+11. **Prune workflow**: close a PR; both `:pr-N` and `:buildcache-pr-N` tags
+    gone within minutes; untagged digests across all five packages swept.
+12. **`:main` rebuild**: merge a PR with image-affecting paths;
+    `docker_build.yml` rebuilds every image, overwrites `:main`, and refreshes
+    `:buildcache`.
 13. **lhci budget**: regress landing perf; `lhci` red; `required` red; merge
     disabled.
 
@@ -1220,15 +1255,15 @@ after two weeks of green data.
 
 #### Task 6: docker_build
 
-- PR touching `apps/api/src/main.rs`; `docker_build` (4 legs) runs after fast
+- PR touching `apps/api/src/main.rs`; `docker_build` (5 legs) runs after fast
   bucket.
-- Log shows `Importing cache manifest from ghcr.io/<owner>/<repo>/api:main`.
-- GHCR shows `:sha` and `:pr-<N>` tags.
+- Log shows `Importing cache manifest from ghcr.io/<owner>/<repo>/api:buildcache`.
+- GHCR shows `:pr-<N>` and `:buildcache-pr-<N>` tags. No SHA tag.
 
 #### Task 7: e2e_test matrix
 
 - PR touching `apps/api/src/main.rs`; three legs run after `docker_build`.
-- `e2e_test (api)` log shows `Pulling ghcr.io/<owner>/<repo>/api:<sha>` and
+- `e2e_test (api)` log shows `Pulling ghcr.io/<owner>/<repo>/api:pr-<N>` and
   `--no-build`.
 - `cargo test --test e2e -- --test-threads=1` passes.
 - Artifacts (always): `playwright-report`, `test-results`. On failure only:
@@ -1242,13 +1277,16 @@ after two weeks of green data.
 
 #### Task 9: prune_pr_cache.yml
 
-- Close a PR; `:pr-N` tags gone within minutes.
+- Close a PR; both `:pr-N` and `:buildcache-pr-N` tags gone within minutes.
+- `dataaxiom/ghcr-cleanup-action` log shows untagged digests deleted across
+  every package in the matrix.
 
-#### Task 10: tag_main_cache.yml
+#### Task 10: Simplify docker cache
 
-- Merge a PR with image-affecting change; `Tag Main Cache` runs in under a
-  minute.
-- `docker buildx imagetools inspect <image>:main` shows the merge digest.
+- Merge a PR with image-affecting change; `Docker Build` runs on `push: main`
+  for every image.
+- `docker buildx imagetools inspect <image>:main` shows the rebuilt digest;
+  `<image>:buildcache` refreshes alongside.
 
 #### Task 11: Trim pre-commit
 
@@ -1366,7 +1404,7 @@ flowchart TD
     T6 --> T7[7. e2e_test.yml matrix<br/>wired into pr.yml]
     T5 --> T8[8. lhci.yml wired into pr.yml]
     T7 --> T9[9. prune_pr_cache.yml]
-    T7 --> T10[10. tag_main_cache.yml]
+    T7 --> T10[10. Simplify docker cache<br/>~~tag_main_cache.yml~~]
     T5 --> T11[11. Trim pre-commit<br/>drop turbo-test-e2e,<br/>modify cargo_coverage.sh,<br/>add act-pr]
     T7 --> T12[12. Playwright configs<br/>wait-for-port + retries:1]
     T2 --> T13[13. dependabot.yml]
@@ -1383,11 +1421,11 @@ flowchart TD
 | 3   | lint.yml with all jobs                                                      | Add `lint.yml` with the nine parallel jobs from Interfaces. Each job path-gated via inputs from `pr.yml`.                                                                                                                                                                                                                             | Each sub-job runs green via `workflow_dispatch`. Each uses the same binary as the equivalent pre-commit hook.                                                                                                                             | 2            |
 | 4   | type_check + unit_test + integration_test + security_audit reusables        | Add the four reusables. `unit_test.yml` multi-job (vitest_unit + cargo_test_unit + bashunit). `security_audit.yml` multi-job (trivy + cargo_audit + bun_audit, two-pass).                                                                                                                                                             | Each runs green via `workflow_dispatch`. `trivy fs --severity HIGH,CRITICAL` and `bashunit` match the pre-commit hooks.                                                                                                                   | 2            |
 | 5   | pr.yml orchestrator (fast bucket only)                                      | Add `pr.yml` with `on: pull_request`, `prepare` job, dispatches to the five fast-bucket reusables with per-surface gating, and the `required` aggregator. Add `.github/act/event_pr.json`.                                                                                                                                            | Docs-only PR: markdown_lint runs; ignored-only PR: every reusable skipped, `required` green. TS-only PR: right subset runs.                                                                                                               | 3, 4         |
-| 6   | docker_build wired into pr.yml                                              | Add `docker_build.yml` with the unconditional 4-image matrix. Wire into `pr.yml` with fork-PR exemption. Add `:sha` + `:pr-N` tag publish, `:main` baseline cache-from, conditional `cache-to` skip on forks.                                                                                                                         | A Rust PR produces all four `:sha` images plus `:pr-N`. Fork PR shows docker-image job skipped without error.                                                                                                                             | 5            |
+| 6   | docker_build wired into pr.yml                                              | Add `docker_build.yml` with the unconditional 5-image matrix. Wire into `pr.yml` with fork-PR exemption. Tag publish via `docker/metadata-action` (`:pr-N` on PR, `:main` on `push: main`); `cache-from = :buildcache + :buildcache-pr-N`; `cache-to` writes `:buildcache-pr-N` on PRs and `:buildcache` on `push: main`.              | A Rust PR produces all five `:pr-N` images. Fork PR builds without pushing. `push: main` overwrites `:main` and refreshes `:buildcache` for every image.                                                                                  | 5            |
 | 7   | e2e_test.yml matrix wired into pr.yml                                       | Add `e2e_test.yml` with `matrix: [api, landing, web]`, using `docker_compose_up`. api leg runs `cargo test --test e2e -- --test-threads=1`. Action sets `TOKENOVERFLOW_IMAGE_TAG` and `TOKENOVERFLOW_IMAGE_REPO` before compose.                                                                                                      | All three legs run green. Artifacts uploaded. `up` uses `--no-build`.                                                                                                                                                                     | 6            |
 | 8   | lhci.yml wired into pr.yml                                                  | Add `lhci.yml` reusable running `bun run --filter=@tokenoverflow/landing test:lhci`. Gate on `landing` or `workflows`. Add to `required` aggregator gated behind `landing` or `workflows`.                                                                                                                                            | Landing PR runs `lhci` green; non-landing PR skips `lhci`. Budget regression turns `lhci` red.                                                                                                                                            | 5            |
-| 9   | prune_pr_cache.yml                                                          | Add the workflow. Closing a PR deletes `:pr-N` tags.                                                                                                                                                                                                                                                                                  | Closing a probe PR removes its `:pr-N` tags within minutes.                                                                                                                                                                               | 7            |
-| 10  | tag_main_cache.yml                                                          | Add the sidecar. On `push: main` for image-affecting paths, retag each `:sha` to `:main`.                                                                                                                                                                                                                                             | A merge to `main` produces a `Tag Main Cache` run refreshing `:main` for each of 4 images within a minute.                                                                                                                                | 7            |
+| 9   | prune_pr_cache.yml                                                          | Add the workflow. Closing a PR deletes both `:pr-N` and `:buildcache-pr-N` tags.                                                                                                                                                                                                                                                      | Closing a probe PR removes both tag families within minutes.                                                                                                                                                                              | 7            |
+| 10  | ~~tag_main_cache.yml~~ Simplify docker cache                                | Implementation diverged from initial design; see PR for the simpler architecture that replaces both `docker_build.yml`'s cache scheme (now `:buildcache` + `:buildcache-pr-N`) and removes `tag_main_cache.yml` (replaced by `docker_build.yml`'s own `push: main` trigger).                                                          | A merge to `main` rebuilds every image and refreshes `:buildcache`; closing a PR drops `:buildcache-pr-N`.                                                                                                                                | 7            |
 | 11  | Trim pre-commit (drop turbo-test-e2e, modify cargo_coverage.sh, add act-pr) | (a) Remove `turbo-test-e2e`. (b) Edit `cargo_coverage.sh` to drop `--test e2e`. (c) Add `act-pr` hook scoped to new workflow + composite action files.                                                                                                                                                                                | Pre-commit no longer boots compose for e2e; cargo-coverage skips the e2e binary; editing `pr.yml` triggers `act-pr`.                                                                                                                      | 5            |
 | 12  | Playwright configs                                                          | Drop `webServer` from web config, add wait-for-port preflight, set `retries: process.env.CI ? 1 : 0` on both.                                                                                                                                                                                                                         | Local run against not-up stack prints the helpful error; CI retries one transient failure per spec.                                                                                                                                       | 7            |
 | 13  | dependabot.yml                                                              | Configure github-actions updates with weekly schedule and grouped PRs for workflows and each composite action directory (4 dirs).                                                                                                                                                                                                     | Dependabot opens a bump PR within 7 days of a new action SHA. PR bumps SHA + comment in lockstep.                                                                                                                                         | 2            |

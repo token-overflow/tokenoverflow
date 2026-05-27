@@ -26,6 +26,9 @@ jobs:
       REPO_NAME: ${{ github.event.repository.name }}
     steps:
       - uses: dataaxiom/ghcr-cleanup-action@f092b48ba3b604b2a83690dc4b2bbb3392e1045f  # v1.2.1
+        if: env.ACT != 'true'
         with:
+          # Keep in sync with `docker_build.yml`'s image matrix.
           packages: ${{ env.REPO_NAME }}/api,${{ env.REPO_NAME }}/embedding_service,${{ env.REPO_NAME }}/landing,${{ env.REPO_NAME }}/web,${{ env.REPO_NAME }}/migrations
-          delete-tags: pr-${{ github.event.pull_request.number }}
+          delete-tags: pr-${{ github.event.pull_request.number }},buildcache-pr-${{ github.event.pull_request.number }}
+          delete-untagged: true

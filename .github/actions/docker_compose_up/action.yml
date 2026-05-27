@@ -8,7 +8,7 @@ inputs:
     description: Compose profile to bring up (e.g. `api`, `landing`, `web`).
     required: true
   tag:
-    description: Image tag to pull (e.g. the PR head SHA).
+    description: Image tag to pull (e.g. pr-123 or main).
     required: true
 
 runs:

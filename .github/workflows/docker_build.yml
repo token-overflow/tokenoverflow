@@ -1,8 +1,29 @@
 name: Docker Build
 
+# `:buildcache` is the shared baseline refreshed on every `push: main`.
+# `:buildcache-pr-N` is per-PR and seeds repeat pushes to the same PR.
+
 on:
   workflow_call:
   workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'apps/api/**'
+      - 'apps/embedding_service/**'
+      - 'apps/so_tag_sync/**'
+      - 'apps/web/**'
+      - 'apps/landing/**'
+      - 'packages/**'
+      - 'integrations/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'package.json'
+      - 'bun.lock'
+      - 'bunfig.toml'
+      - 'turbo.json'
+      - 'apps/*/Dockerfile'
+      - 'infra/docker/**'
 
 permissions:
   contents: read
@@ -11,6 +32,9 @@ permissions:
 jobs:
   docker_build:
     name: Docker Build
+    concurrency:
+      group: docker-build-${{ github.event_name }}-${{ matrix.image }}-${{ github.event.pull_request.number || github.ref_name }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 20
     strategy:
@@ -31,39 +55,58 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      # GHCR stores paths lowercase; mirror the `docker_compose_up` convention
-      # so a mixed-case fork owner cannot break the publish/pull contract.
-      - name: Export lowercase repo path
+      # GHCR paths must be lowercase. `WRITE_REGISTRY` gates both `push:` and
+      # `cache-to`: true for same-repo PRs, `push: main`, and `workflow_dispatch`.
+      - name: Export lowercase repo path and write gate
         shell: bash
-        run: echo "REPO=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+        env:
+          IS_SAME_REPO_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+          IS_PUSH_OR_DISPATCH: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') }}
+        run: |
+          {
+            echo "REPO=${GITHUB_REPOSITORY,,}"
+            if [[ "${IS_SAME_REPO_PR}" == "true" || "${IS_PUSH_OR_DISPATCH}" == "true" ]]; then
+              echo "WRITE_REGISTRY=true"
+            else
+              echo "WRITE_REGISTRY=false"
+            fi
+          } >> "$GITHUB_ENV"
 
       - name: Set up Docker Buildx
-        if: ${{ env.ACT != 'true' }}
+        if: env.ACT != 'true'
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3.12.0
 
       - name: Log in to GHCR
-        if: ${{ env.ACT != 'true' }}
+        if: env.ACT != 'true'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Same-repo PRs publish `:pr-N` and write `:pr-N` cache; forks can only
-      # read the `:main` baseline. Empty lines in the multiline inputs are
-      # skipped by the action's CSV parser (skipEmptyLines: true).
+      - name: Extract image metadata
+        if: env.ACT != 'true'
+        id: meta
+        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9  # v6.1.0
+        with:
+          images: ghcr.io/${{ env.REPO }}/${{ matrix.image }}
+          tags: |
+            type=ref,event=pr
+            type=ref,event=branch
+
+      # Same-repo PRs, push: main, and manual dispatches publish to GHCR.
+      # Fork PRs build but cannot push (no write access via `GITHUB_TOKEN`).
       - name: Build and push
-        if: ${{ env.ACT != 'true' }}
+        if: env.ACT != 'true'
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6.19.2
         with:
           context: .
           file: ${{ matrix.dockerfile }}
           platforms: linux/arm64
-          push: true
-          tags: |
-            ghcr.io/${{ env.REPO }}/${{ matrix.image }}:${{ github.event.pull_request.head.sha || github.sha }}
-            ${{ github.event.pull_request.head.repo.full_name == github.repository && format('ghcr.io/{0}/{1}:pr-{2}', env.REPO, matrix.image, github.event.pull_request.number) || '' }}
+          push: ${{ env.WRITE_REGISTRY == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: |
-            type=registry,ref=ghcr.io/${{ env.REPO }}/${{ matrix.image }}:main
-            ${{ github.event.pull_request.head.repo.full_name == github.repository && format('type=registry,ref=ghcr.io/{0}/{1}:pr-{2}', env.REPO, matrix.image, github.event.pull_request.number) || '' }}
-          cache-to: ${{ github.event.pull_request.head.repo.full_name == github.repository && format('type=registry,ref=ghcr.io/{0}/{1}:pr-{2},mode=max', env.REPO, matrix.image, github.event.pull_request.number) || '' }}
+            type=registry,ref=ghcr.io/${{ env.REPO }}/${{ matrix.image }}:buildcache
+            ${{ github.event_name == 'pull_request' && format('type=registry,ref=ghcr.io/{0}/{1}:buildcache-pr-{2}', env.REPO, matrix.image, github.event.pull_request.number) || '' }}
+          cache-to: ${{ env.WRITE_REGISTRY == 'true' && (github.event_name == 'pull_request' && format('type=registry,ref=ghcr.io/{0}/{1}:buildcache-pr-{2},mode=max', env.REPO, matrix.image, github.event.pull_request.number) || format('type=registry,ref=ghcr.io/{0}/{1}:buildcache,mode=max', env.REPO, matrix.image)) || '' }}
