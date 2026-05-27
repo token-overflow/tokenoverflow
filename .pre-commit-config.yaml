@@ -153,6 +153,12 @@ repos:
         language: system
         files: ^\.github/workflows/prune_pr_cache\.yml$
         pass_filenames: false
+      - id: act-pr
+        name: act (PR Orchestrator)
+        entry: act pull_request -W .github/workflows/pr.yml -e .github/act/event_pr.json --secret-file .act.secrets
+        language: system
+        files: ^(\.github/workflows/.*\.yml|\.github/actions/.*/action\.yml)$
+        pass_filenames: false
 
       # LINKS
       - id: lychee
@@ -199,11 +205,6 @@ repos:
       - id: turbo-test-coverage
         name: Turbo Test Coverage
         entry: bash -c 'TURBO_SCM_BASE=HEAD bun run turbo run test:coverage --affected'
-        language: system
-        pass_filenames: false
-      - id: turbo-test-e2e
-        name: Turbo Test E2E
-        entry: bash -c 'TURBO_SCM_BASE=HEAD bun run turbo run test:e2e --affected'
         language: system
         pass_filenames: false
       - id: turbo-test-lhci

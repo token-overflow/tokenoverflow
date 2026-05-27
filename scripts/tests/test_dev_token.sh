@@ -222,12 +222,9 @@ function test_default_sub_is_system() {
 
 function test_missing_private_key_returns_error() {
   local output
-  # Override PRIVATE_KEY_PATH by temporarily renaming the key
-  local key="apps/api/tests/assets/auth/test_private_key.pem"
-  mv "$key" "${key}.bak"
-  output=$($SCRIPT 2>&1)
-  local exit_code=$?
-  mv "${key}.bak" "$key"
-  assert_equals "1" "$exit_code"
+  # Point at a non-existent path via env override. Avoids renaming the real
+  # key, which would touch its ctime and confuse git's stat cache.
+  output=$(TOKENOVERFLOW_PRIVATE_KEY_PATH=/nonexistent/test_private_key.pem $SCRIPT 2>&1)
+  assert_exit_code "1"
   assert_contains "test private key not found" "$output"
 }
