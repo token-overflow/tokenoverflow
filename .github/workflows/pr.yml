@@ -32,17 +32,14 @@ jobs:
       markdown: ${{ steps.filter.outputs.markdown }}
       openapi: ${{ steps.filter.outputs.openapi }}
       astro: ${{ steps.filter.outputs.astro }}
-      # Per-job gates, consumed by dispatch `if:` and the aggregator. The
-      # fork-only gates fold the same-repo guard in so callers stay one-line.
-      same_repo: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
       lint_needed: ${{ steps.filter.outputs.rust == 'true' || steps.filter.outputs.ts == 'true' || steps.filter.outputs.shell == 'true' || steps.filter.outputs.markdown == 'true' || steps.filter.outputs.terraform == 'true' || steps.filter.outputs.astro == 'true' || steps.filter.outputs.openapi == 'true' || steps.filter.outputs.workflows == 'true' }}
       type_check_needed: ${{ steps.filter.outputs.ts == 'true' || steps.filter.outputs.workflows == 'true' }}
       unit_test_needed: ${{ steps.filter.outputs.rust == 'true' || steps.filter.outputs.ts == 'true' || steps.filter.outputs.shell == 'true' || steps.filter.outputs.workflows == 'true' }}
       integration_test_needed: ${{ steps.filter.outputs.rust == 'true' || steps.filter.outputs.workflows == 'true' }}
       security_audit_needed: ${{ steps.filter.outputs.rust == 'true' || steps.filter.outputs.ts == 'true' || steps.filter.outputs.docker == 'true' || steps.filter.outputs.workflows == 'true' }}
       lhci_needed: ${{ steps.filter.outputs.landing == 'true' || steps.filter.outputs.workflows == 'true' }}
-      docker_build_needed: ${{ (steps.filter.outputs.rust == 'true' || steps.filter.outputs.docker == 'true' || steps.filter.outputs.workflows == 'true') && github.event.pull_request.head.repo.full_name == github.repository }}
-      e2e_test_needed: ${{ (steps.filter.outputs.api == 'true' || steps.filter.outputs.embedding == 'true' || steps.filter.outputs.landing == 'true' || steps.filter.outputs.web == 'true' || steps.filter.outputs.docker == 'true' || steps.filter.outputs.openapi == 'true' || steps.filter.outputs.workflows == 'true') && github.event.pull_request.head.repo.full_name == github.repository }}
+      docker_build_needed: ${{ (steps.filter.outputs.rust == 'true' || steps.filter.outputs.ts == 'true' || steps.filter.outputs.docker == 'true') && github.event.pull_request.head.repo.full_name == github.repository }}
+      e2e_test_needed: ${{ (steps.filter.outputs.rust == 'true' || steps.filter.outputs.ts == 'true' || steps.filter.outputs.docker == 'true') && github.event.pull_request.head.repo.full_name == github.repository }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -56,6 +53,7 @@ jobs:
               - 'apps/api/**'
               - 'apps/embedding_service/**'
               - 'apps/so_tag_sync/**'
+              - 'integrations/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
             ts:
@@ -63,6 +61,7 @@ jobs:
               - 'apps/landing/**'
               - 'packages/**'
               - 'apps/api/openapi.json'
+              - 'package.json'
               - 'bun.lock'
               - 'bunfig.toml'
               - 'turbo.json'
@@ -184,6 +183,7 @@ jobs:
     steps:
       - name: Fail if conditional jobs failed
         if: |
+          needs.prepare.result != 'success' ||
           (needs.prepare.outputs.lint_needed == 'true' && needs.lint.result != 'success') ||
           (needs.prepare.outputs.type_check_needed == 'true' && needs.type_check.result != 'success') ||
           (needs.prepare.outputs.unit_test_needed == 'true' && needs.unit_test.result != 'success') ||

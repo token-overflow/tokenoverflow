@@ -147,6 +147,12 @@ repos:
         language: system
         files: ^\.github/workflows/deploy_web\.yml$
         pass_filenames: false
+      - id: act-prune-pr-cache
+        name: act (Prune PR Cache)
+        entry: act pull_request -W .github/workflows/prune_pr_cache.yml -e .github/act/event_pr_closed.json --secret-file .act.secrets
+        language: system
+        files: ^\.github/workflows/prune_pr_cache\.yml$
+        pass_filenames: false
 
       # LINKS
       - id: lychee

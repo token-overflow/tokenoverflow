@@ -32,7 +32,7 @@ jobs:
         uses: ./.github/actions/docker_compose_up
         with:
           profile: ${{ matrix.app }}
-          tag: ${{ github.event.pull_request.head.sha || github.sha }}
+          tag: pr-${{ github.event.pull_request.number || 'main' }}
 
       # diesel `postgres` feature links against libpq at test time. Deploy
       # workflows side-step this via `--features bundled-libs`; tests don't.

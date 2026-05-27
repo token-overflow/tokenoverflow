@@ -1,0 +1,21 @@
+{
+  "act": true,
+  "action": "closed",
+  "pull_request": {
+    "number": 1,
+    "head": {
+      "ref": "feature-branch",
+      "repo": {
+        "full_name": "token-overflow/tokenoverflow"
+      }
+    },
+    "base": {
+      "ref": "main"
+    }
+  },
+  "repository": {
+    "default_branch": "main",
+    "full_name": "token-overflow/tokenoverflow",
+    "name": "tokenoverflow"
+  }
+}
