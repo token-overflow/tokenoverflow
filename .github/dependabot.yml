@@ -8,10 +8,7 @@ updates:
               patterns: ["*"]
     - package-ecosystem: github-actions
       directories:
-          - /.github/actions/bun_install
-          - /.github/actions/rust_toolchain
-          - /.github/actions/docker_compose_up
-          - /.github/actions/playwright_install
+          - /.github/actions/*
       schedule: { interval: weekly }
       groups:
           composite-action-internals:
