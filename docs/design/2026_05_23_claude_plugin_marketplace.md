@@ -42,9 +42,12 @@ References: brief at `docs/brief/2026_01_31_tokenoverflow.md`, plugin source at
    (no `../common/...` references).
 3. Explicit semantic versioning for the plugin (`version` in
    `plugin.json`) with a documented release workflow.
-4. A pre-commit hook that runs `claude plugin validate --strict` against
-   the marketplace and the plugin when `.claude-plugin/**` or
-   `integrations/claude/**` changes.
+4. Dual `claude plugin validate --strict` enforcement against the
+   marketplace and the plugin when `.claude-plugin/**` or
+   `integrations/claude/**` changes: a local pre-commit hook for fast
+   feedback before push, and a mirrored job in the PR GitHub Actions
+   workflow so contributors who bypass pre-commit (or open PRs without
+   local hooks installed) are still caught.
 5. End-user installation instructions in the root `README.md` and in
    `integrations/claude/README.md`, including the recommended `--sparse`
    flag for the marketplace add.
@@ -335,12 +338,18 @@ plugin dir before commit / before publishing.
 The marketplace is the public face of the plugin. A malformed `marketplace.json`
 silently breaks users on their next Claude Code startup.
 
-#### ✅ Option 1: Pre-commit hook that runs `claude plugin validate --strict`
+#### ✅ Option 1: Pre-commit hook + CI step, both `claude plugin validate --strict`
 
-Add a hook to the existing `.pre-commit-config.yaml` that runs only when
-`.claude-plugin/**` or `integrations/claude/**` changes. The two validator
-invocations are chained inline with `&&`, matching the existing inline
-pattern used by `turbo-check`, `turbo-lint`, etc.:
+Defense-in-depth: a pre-commit hook gives contributors fast local feedback
+before push, and a mirrored job in the PR GitHub Actions workflow catches
+the same failure when pre-commit is bypassed or the PR is opened without
+local hooks installed. Both layers run the same two validator invocations
+against the same paths, so a green pre-commit run predicts a green CI run.
+
+The pre-commit hook lives under the `repo: local` block of
+`.pre-commit-config.yaml`. The validator invocations are chained inline
+with `&&`, matching the existing inline pattern used by `turbo-check`,
+`turbo-lint`, etc.:
 
 ```yaml
 - id: claude-plugin-validate
@@ -351,44 +360,60 @@ pattern used by `turbo-check`, `turbo-lint`, etc.:
   pass_filenames: false
 ```
 
+The CI side adds a `claude_plugin_validate` job to the existing reusable
+`.github/workflows/lint.yml`, gated on a new `claude_plugin` path-filter
+output emitted from `pr.yml`'s `prepare` job. The path filter mirrors the
+pre-commit `files:` regex:
+
+```yaml
+claude_plugin:
+  - '.claude-plugin/**'
+  - 'integrations/claude/**'
+```
+
+The job installs the `claude` CLI from npm
+(`@anthropic-ai/claude-code@2.1.158`) using the same `actions/setup-node`
+pinned commit already used by `type_check.yml` and `lhci.yml`, then runs
+the two validator invocations. The exact version pin matches the repo's
+convention for third-party CLIs (e.g. `tflint_version: v0.62.1`) and
+prevents a validator change from silently flipping a previously-green PR
+red.
+
 The `claude` CLI is already declared in `Brewfile` as
-`cask "claude-code@latest"`, so no new tool install is needed.
+`cask "claude-code@latest"` for local pre-commit use; the Brewfile cask is
+macOS-only, hence the npm install on the Linux CI runner.
 
 **Pros:**
 - Catches schema errors, duplicate plugin names, source path traversal,
-  YAML frontmatter problems, and `hooks/hooks.json` JSON errors before the
-  commit lands.
-- `--strict` upgrades warnings (unrecognized fields, non-kebab-case names) to
-  errors so we never ship a sloppy manifest.
-- Zero CI footprint: no new GitHub Actions workflow, no runner minutes
-  burned on every PR.
-- Matches the project's existing convention of doing heavy lifting in
-  pre-commit and keeping CI thin.
+  YAML frontmatter problems, and `hooks/hooks.json` JSON errors before
+  the commit lands locally; CI catches the same failures when pre-commit
+  is bypassed.
+- `--strict` upgrades warnings (unrecognized fields, non-kebab-case
+  names) to errors at both layers so we never ship a sloppy manifest.
+- CI cost is bounded: the job is path-filtered, so unrelated PRs do not
+  burn runner minutes.
+- Matches the project's existing convention of running both pre-commit
+  and a thin CI mirror (e.g. shellcheck, markdownlint, tflint).
 
 **Cons:**
-- A contributor who bypasses pre-commit (`--no-verify`) can land a broken
-  config. Acceptable: the project's CLAUDE.md already forbids bypassing
-  hooks, and the cost of a missed validation is a broken cache on next
-  startup, not silent data loss.
-- The `claude` CLI must be installed locally. Already true via the
-  Brewfile, so this is not new friction.
+- Two places to update if the validator command ever changes. Acceptable:
+  the command is short, both layers chain the same two invocations, and a
+  test case in the test plan exercises both ends.
+- The `claude` CLI must be installed locally for the pre-commit hook.
+  Already true via the Brewfile, so this is not new friction.
 
-#### ❌ Option 2: GitHub Actions workflow that runs `claude plugin validate`
+#### ❌ Option 2: Pre-commit only (historical alternative, superseded)
 
-A new `.github/workflows/claude_plugin.yml` runs the same validator on every
-PR and push to `main`.
+The original design ran the validator only in pre-commit on the assumption
+that the project's CLAUDE.md already forbids bypassing hooks. After
+revisiting, the failure mode mattered more than the CI cost: a single
+`--no-verify` (or a contributor without local hooks) ships a broken
+marketplace cache to every user on next Claude Code startup. The CI
+mirror under Option 1 closes that gap for negligible runner-minute cost
+because the job is path-filtered to plugin changes.
 
-**Pros:**
-- Catches failures even when contributors bypass pre-commit.
-- No local tool requirement.
-
-**Cons:**
-- Out of scope: the user explicitly opted to keep this work within
-  pre-commit and not add a CI workflow.
-- Adds runner minutes and another workflow to maintain.
-
-**Rationale:** Rejected for the MVP. Pre-commit covers the same checks
-without the CI overhead.
+**Rationale:** Superseded by Option 1. Kept here as the historical
+alternative.
 
 #### ❌ Option 3: Manual validation only
 
@@ -507,7 +532,8 @@ tokenoverflow/                        # monorepo root
 │   └── marketplace.json              # marketplace catalog (updated)
 ├── .github/
 │   └── workflows/
-│       └── claude_plugin.yml         # NEW: claude plugin validate --strict
+│       ├── pr.yml                    # adds `claude_plugin` path filter
+│       └── lint.yml                  # adds `claude_plugin_validate` job
 ├── integrations/
 │   └── claude/                       # the plugin itself (self-contained)
 │       ├── .claude-plugin/
@@ -677,7 +703,9 @@ claude plugin validate ./integrations/claude --strict
 | `README.md` install snippet                  | Exists            | Add `--sparse .claude-plugin` to the marketplace add command.                |
 | `integrations/claude/README.md`              | Missing           | Add. Documents install, OAuth, troubleshooting, and release flow.            |
 | `.pre-commit-config.yaml`                    | Exists            | Add a `claude-plugin-validate` hook under the `repo: local` block, gated on `^(\.claude-plugin/\|integrations/claude/)`. Validator chained inline with `bash -c '... && ...'`. |
-| `Brewfile`                                   | Exists            | No change. `cask "claude-code@latest"` already provides the `claude` CLI.    |
+| `.github/workflows/pr.yml`                   | Exists            | Add a `claude_plugin` path-filter output (mirrors the pre-commit `files:` regex), thread it through `lint_needed`, and pass it as a new `claude_plugin` input to the `lint` reusable. |
+| `.github/workflows/lint.yml`                 | Exists            | Add a `claude_plugin` boolean input and a `claude_plugin_validate` job that installs Node 22 + `npm install -g @anthropic-ai/claude-code@2.1.158`, then runs the two `claude plugin validate --strict` invocations. |
+| `Brewfile`                                   | Exists            | No change. `cask "claude-code@latest"` already provides the `claude` CLI locally; CI installs the same tool via npm.    |
 | `scripts/src/claude.sh`, `scripts/src/mcp.sh` | Exist            | No change; they already use `--plugin-dir ./integrations/claude`.            |
 
 Nothing in the design duplicates an existing capability. We are filling gaps,
@@ -685,7 +713,10 @@ not parallel-implementing.
 
 ## Logic
 
-One piece of logic introduced by this design.
+Two layers of validation introduced by this design. Both run
+`claude plugin validate . --strict` followed by
+`claude plugin validate ./integrations/claude --strict`, gated to fire only
+when the marketplace or plugin tree changes.
 
 ### Pre-commit validation hook
 
@@ -709,6 +740,33 @@ tree changes. It does not run on unrelated commits.
 The hook catches schema errors in `marketplace.json` and `plugin.json`,
 hook JSON, skill YAML frontmatter, source path traversals, and unsupported
 agent frontmatter fields before the commit lands.
+
+### CI validation job
+
+Add a `claude_plugin_validate` job to the existing reusable
+`.github/workflows/lint.yml`, mirroring the shape of the other per-tool
+lint jobs (`tflint`, `shell_lint`, `markdown_lint`). The PR orchestrator
+(`pr.yml`) emits a new `claude_plugin` path-filter output from its
+`prepare` job, mirroring the pre-commit `files:` regex:
+
+```yaml
+claude_plugin:
+  - '.claude-plugin/**'
+  - 'integrations/claude/**'
+```
+
+The output feeds the `lint` reusable as a new `claude_plugin` boolean
+input and contributes to `lint_needed`, so unrelated PRs do not spin up
+the job. The job installs Node 22 (`actions/setup-node`, same pinned
+commit as `type_check.yml` and `lhci.yml`), installs the `claude` CLI via
+`npm install -g @anthropic-ai/claude-code@2.1.158`, then runs the two
+validator invocations. The exact version pin guards against a validator
+change silently flipping a previously-green PR red.
+
+The CI job exists because pre-commit can be bypassed (`--no-verify`, or
+contributors without local hooks installed). Both layers running the same
+strict validator means a green pre-commit predicts a green CI run, and a
+broken marketplace cannot land on `main` through either path.
 
 ### Release flow
 
@@ -836,6 +894,11 @@ None. The change is configuration, not code.
 - **Pre-commit blocks broken commits**: stage a malformed
   `marketplace.json` (e.g. trailing comma). `git commit` must fail with a
   schema error from the validate hook.
+- **CI blocks broken PRs**: open a PR that introduces a malformed
+  `marketplace.json` (e.g. trailing comma) without running pre-commit.
+  The `claude_plugin_validate` job in the PR workflow must run and fail
+  with a schema error. Open a second PR that touches only an unrelated
+  file (e.g. a Rust source under `apps/api/`); the job must not run.
 
 ### Out-of-scope guardrails
 
@@ -865,6 +928,11 @@ None. The change is configuration, not code.
 - `scripts/src/mcp.sh` and `scripts/src/claude.sh` keep working as-is.
 - One new pre-commit hook (`claude-plugin-validate`) with the validator
   chained inline via `bash -c`. No new script files.
+- One new CI job (`claude_plugin_validate`) inside the existing reusable
+  `lint.yml`, gated on the new `claude_plugin` path filter in `pr.yml`.
+  Installs the `claude` CLI from npm
+  (`@anthropic-ai/claude-code@2.1.158`, exact pin) on the same
+  `ubuntu-24.04-arm` runner the other lint jobs use.
 
 ## Tasks
 
@@ -878,7 +946,7 @@ work.
 | 2 | Fix the researcher agent frontmatter | Remove the unsupported `mcpServers:` frontmatter (rejected by `--strict` validation). Replace the existing `tools:` whitelist with a `disallowedTools: Write, Edit, NotebookEdit, Bash, WebSearch, WebFetch` denylist so the agent inherits all `mcp__tokenoverflow__*` tools (now and as new ones are added) but cannot mutate files, execute shells, or fall back to web search. | `claude plugin validate ./integrations/claude` passes. The agent body's MCP tool calls (`search_questions`, `upvote_answer`, `downvote_answer`, `submit_answer`) all resolve. `Write`, `Edit`, `NotebookEdit`, `Bash`, `WebSearch`, `WebFetch` cannot be invoked from the agent. | None |
 | 3 | Switch marketplace source to `git-subdir` | Update `.claude-plugin/marketplace.json`: replace the relative `source` with a `git-subdir` block pointing at `integrations/claude`, drop the legacy `metadata` wrapper and promote `description` to the top level, remove the plugin-entry `version` field, add `$schema`. | `claude plugin validate .` passes with `--strict`. End-to-end install from `token-overflow/tokenoverflow` sparse-clones only `integrations/claude/`. | 1 |
 | 4 | Add version + display name to `plugin.json` | Set `version: "0.0.1"`, `displayName: "TokenOverflow"`, `$schema`. | `claude plugin validate ./integrations/claude --strict` passes. `/plugin` UI shows "TokenOverflow" with version `0.0.1`. | 1, 2 |
-| 5 | Pre-commit validation hook | Add the `claude-plugin-validate` hook to `.pre-commit-config.yaml` under the `repo: local` block, gated on `^(\.claude-plugin/\|integrations/claude/)`. Use `entry: bash -c 'claude plugin validate . --strict && claude plugin validate ./integrations/claude --strict'`. | `pre-commit run claude-plugin-validate --all-files` passes. A staged malformed `marketplace.json` blocks `git commit` with a schema error. The hook does not run when only unrelated files are staged. | 3, 4 |
+| 5 | Pre-commit + CI validation | Add the `claude-plugin-validate` hook to `.pre-commit-config.yaml` under the `repo: local` block, gated on `^(\.claude-plugin/\|integrations/claude/)`, with `entry: bash -c 'claude plugin validate . --strict && claude plugin validate ./integrations/claude --strict'`. Mirror the check in CI: add a `claude_plugin` path filter to `.github/workflows/pr.yml` (matching `.claude-plugin/**` and `integrations/claude/**`), pass it through to the `lint` reusable, and add a `claude_plugin_validate` job in `.github/workflows/lint.yml` that installs `actions/setup-node` + `npm install -g @anthropic-ai/claude-code@2.1.158`, then runs the same two validator invocations. | `pre-commit run claude-plugin-validate --all-files` passes. A staged malformed `marketplace.json` blocks `git commit` with a schema error. The hook does not run when only unrelated files are staged. The CI job runs on PRs that touch the plugin or marketplace, fails on a malformed manifest, and does not run when only unrelated files change. | 3, 4 |
 | 6 | Plugin README | Add `integrations/claude/README.md` with four sections: (a) install (the `--sparse .claude-plugin` snippet and `/mcp` OAuth), (b) local test (how to run the plugin via `--plugin-dir` for development), (c) release (bump version, merge, tag), (d) troubleshooting (auto-update is off by default, manual `/plugin marketplace update`, how to report bugs). | A new contributor can follow the README to install the plugin, run it locally for development, and ship a new version without consulting other docs. | 4 |
 | 7 | Root README update | Update the install snippet to include `--sparse .claude-plugin` and add a short note on the lean-clone behavior. | Snippet runs end-to-end against a real Claude Code install. | 3 |
 
@@ -887,7 +955,7 @@ graph TD
     T1[1. Self-contain plugin] --> T3[3. git-subdir source]
     T1 --> T4[4. version + displayName]
     T2[2. Fix agent frontmatter] --> T4
-    T3 --> T5[5. CI validate workflow]
+    T3 --> T5[5. Pre-commit + CI validate]
     T4 --> T5
     T4 --> T6[6. Plugin README]
     T3 --> T7[7. Root README update]
