@@ -108,22 +108,9 @@ TOKENOVERFLOW_ENV=production bun run test:e2e
 
 ### GHA Workflows
 
-Test GitHub Actions workflows locally
-using [act](https://github.com/nektos/act):
-
-```bash
-source scripts/src/includes.sh
-
-# Run the Terraform workflow (push event)
-act_terraform push
-
-# Run the Deploy API workflow (push event)
-act_deploy push
-```
-
-Cloud-dependent steps (AWS auth, Terraform plan/apply, S3 upload, Lambda
-deploy) are automatically skipped during local runs. The build and validation
-steps run normally.
+Workflow files under `.github/workflows/` are validated by
+[actionlint](https://github.com/rhysd/actionlint) via the pre-commit hook
+on every change. No local runner is needed.
 
 ### API Configuration
 

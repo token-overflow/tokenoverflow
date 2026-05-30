@@ -24,8 +24,5 @@ source "${SCRIPT_DIR}/docker.sh"
 # shellcheck source=scripts/src/mcp.sh
 source "${SCRIPT_DIR}/mcp.sh"
 
-# shellcheck source=scripts/src/act.sh
-source "${SCRIPT_DIR}/act.sh"
-
 # shellcheck source=scripts/src/api.sh
 source "${SCRIPT_DIR}/api.sh"

@@ -25,7 +25,7 @@ brew "git-lfs"
 brew "cargo-audit"
 brew "rust-analyzer"
 brew "cargo-lambda/cargo-lambda/cargo-lambda"
-brew "act"
+brew "actionlint"
 
 cask "orbstack"
 cask "datagrip"

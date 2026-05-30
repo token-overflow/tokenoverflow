@@ -61,6 +61,10 @@ repos:
     rev: 7959c845782fed02ee69303126d4a12d64f1db18  # v0.9.1
     hooks:
       - id: cargo-machete
+  - repo: https://github.com/rhysd/actionlint
+    rev: 914e7df21a07ef503a81201c76d2b11c789d3fca  # v1.7.12
+    hooks:
+      - id: actionlint-system
   - repo: local
     hooks:
       # BASH
@@ -120,44 +124,6 @@ repos:
         entry: scripts/src/git_hooks/check_openapi_spec_drift.sh
         language: script
         files: ^(apps/api/.*\.rs|Cargo\.(toml|lock))$
-        pass_filenames: false
-
-      # GITHUB ACTION
-      - id: act-terraform
-        name: act (Terraform)
-        entry: act push -W .github/workflows/terraform.yml -e .github/act/event_push_main.json --secret-file .act.secrets
-        language: system
-        files: ^\.github/workflows/terraform\.yml$
-        pass_filenames: false
-      - id: act-deploy
-        name: act (Deploy API)
-        entry: act push -W .github/workflows/deploy_api.yml -e .github/act/event_push_main.json --secret-file .act.secrets
-        language: system
-        files: ^\.github/workflows/deploy_api\.yml$
-        pass_filenames: false
-      - id: act-landing
-        name: act (Deploy Landing)
-        entry: act push -W .github/workflows/deploy_landing.yml -e .github/act/event_push_main.json --secret-file .act.secrets
-        language: system
-        files: ^\.github/workflows/deploy_landing\.yml$
-        pass_filenames: false
-      - id: act-deploy-web
-        name: act (Deploy Web)
-        entry: act push -W .github/workflows/deploy_web.yml -e .github/act/event_push_main.json --secret-file .act.secrets
-        language: system
-        files: ^\.github/workflows/deploy_web\.yml$
-        pass_filenames: false
-      - id: act-prune-pr-cache
-        name: act (Prune PR Cache)
-        entry: act pull_request -W .github/workflows/prune_pr_cache.yml -e .github/act/event_pr_closed.json --secret-file .act.secrets
-        language: system
-        files: ^\.github/workflows/prune_pr_cache\.yml$
-        pass_filenames: false
-      - id: act-pr
-        name: act (PR Orchestrator)
-        entry: act pull_request -W .github/workflows/pr.yml -e .github/act/event_pr.json --secret-file .act.secrets
-        language: system
-        files: ^(\.github/workflows/.*\.yml|\.github/actions/.*/action\.yml)$
         pass_filenames: false
 
       # LINKS

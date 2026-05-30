@@ -28,7 +28,6 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Start Docker Compose stack
-        if: env.ACT != 'true'
         uses: ./.github/actions/docker_compose_up
         with:
           profile: ${{ matrix.app }}
@@ -66,34 +65,34 @@ jobs:
       # The e2e tier shares one live Postgres database; `--test-threads=1`
       # serializes the suite to avoid cross-test contention.
       - name: Run api e2e
-        if: matrix.app == 'api' && env.ACT != 'true'
+        if: matrix.app == 'api'
         run: cargo test --test e2e -- --test-threads=1
 
       - name: Run landing e2e
-        if: matrix.app == 'landing' && env.ACT != 'true'
+        if: matrix.app == 'landing'
         run: bun run turbo run test:e2e --filter=@tokenoverflow/landing
 
       - name: Run web e2e
-        if: matrix.app == 'web' && env.ACT != 'true'
+        if: matrix.app == 'web'
         run: bun run turbo run test:e2e --filter=@tokenoverflow/web
 
       # Without `dest:` the action streams logs to stdout for inline UI debugging.
       - name: Stream Docker logs to stdout
-        if: failure() && env.ACT != 'true'
+        if: failure()
         uses: step-security/gh-docker-logs@561ab0d8664f002c3eb106f4cce2799cdc4510d7  # v2.2.7
 
       - name: Collect Docker logs to files
-        if: failure() && env.ACT != 'true'
+        if: failure()
         uses: step-security/gh-docker-logs@561ab0d8664f002c3eb106f4cce2799cdc4510d7  # v2.2.7
         with:
           dest: ./docker-logs
 
       - name: Archive Docker logs
-        if: failure() && env.ACT != 'true'
+        if: failure()
         run: tar -czf docker-logs.tar.gz ./docker-logs
 
       - name: Upload Docker logs
-        if: failure() && env.ACT != 'true'
+        if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
           name: docker-logs-${{ matrix.app }}
