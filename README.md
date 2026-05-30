@@ -106,12 +106,6 @@ TOKENOVERFLOW_ENV=production cargo test -p tokenoverflow --test e2e
 TOKENOVERFLOW_ENV=production bun run test:e2e
 ```
 
-### GHA Workflows
-
-Workflow files under `.github/workflows/` are validated by
-[actionlint](https://github.com/rhysd/actionlint) via the pre-commit hook
-on every change. No local runner is needed.
-
 ### API Configuration
 
 Configuration is managed through TOML files in `apps/api/config/`:
