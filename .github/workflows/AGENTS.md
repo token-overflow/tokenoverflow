@@ -4,4 +4,4 @@
 - Do not use `latest` runners. Instead, re-use the same runner across workflows.
 - If you need a different runner, hardcode the version rather than `latest`.
 - Stay away from brand new, abondoned, or obscure actions.
-- Always test the workflow with ACT and make sure it's part of pre-commit hooks.
+- Validate workflows with `actionlint` (runs in pre-commit on `.github/workflows/**` changes).

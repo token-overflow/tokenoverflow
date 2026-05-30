@@ -37,7 +37,6 @@ jobs:
         uses: ./.github/actions/bun_install
 
       - name: Configure AWS credentials
-        if: ${{ !github.event.act }}
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7  # v6.0.0
         with:
           role-to-assume: ${{ secrets.AWS_IAM_ROLE_ARN }}
@@ -52,7 +51,6 @@ jobs:
           cd apps/web/.output/server && zip -r ../../../../dist/web.zip .
 
       - name: Upload to S3 and update Lambda
-        if: ${{ !github.event.act }}
         run: |
           SHA=$(shasum -a 256 dist/web.zip | cut -c1-12)
           aws s3 cp dist/web.zip "s3://${WEB_BUCKET}/web/${SHA}.zip"

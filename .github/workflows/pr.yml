@@ -56,6 +56,8 @@ jobs:
               - 'integrations/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
+              - '!**/*.md'
+              - '!**/*.mdx'
             ts:
               - 'apps/web/**'
               - 'apps/landing/**'
@@ -65,21 +67,35 @@ jobs:
               - 'bun.lock'
               - 'bunfig.toml'
               - 'turbo.json'
+              - '!**/*.md'
+              - '!**/*.mdx'
             landing:
               - 'apps/landing/**'
+              - '!**/*.md'
+              - '!**/*.mdx'
             web:
               - 'apps/web/**'
+              - '!**/*.md'
+              - '!**/*.mdx'
             api:
               - 'apps/api/**'
+              - '!**/*.md'
+              - '!**/*.mdx'
             embedding:
               - 'apps/embedding_service/**'
+              - '!**/*.md'
+              - '!**/*.mdx'
             docker:
               - 'docker-compose.yml'
               - 'apps/*/Dockerfile'
               - 'infra/docker/**'
+              - '!**/*.md'
+              - '!**/*.mdx'
             workflows:
               - '.github/workflows/**'
               - '.github/actions/**'
+              - '!**/*.md'
+              - '!**/*.mdx'
             terraform:
               - 'terraform/**'
               - '**/*.tf'

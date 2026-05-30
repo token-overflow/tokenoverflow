@@ -550,10 +550,8 @@ turbo.json                                # MODIFIED. gen:api-client inputs now 
   `check_openapi_spec_drift.sh` follow this. The function name
   `gen_api_spec` mirrors the existing `gen_api_client` naming.
 - **GitHub Actions conventions** (`.github/workflows/CLAUDE.md`): pin
-  action SHAs; reuse the same versions; test workflows with `act` and
-  include them in pre-commit. The `act-deploy-web` hook
-  (`.pre-commit-config.yaml:138-143`) already exercises this workflow on
-  qualifying changes.
+  action SHAs; reuse the same versions. The `actionlint` pre-commit hook
+  statically validates the workflow on any change.
 
 ## Interfaces
 
@@ -598,7 +596,7 @@ silent fallback; a missing file means someone broke the contract.
 | `// @ts-nocheck` prepending logic                  | Reused as-is. Lines 35-36 of the codegen script stay.                                  |
 | `apps/web/src/utils/api/waitlist.server.ts`        | Unchanged. The generated SDK shape is unchanged.                                       |
 | `cargo-*` pre-commit hooks (`.pre-commit-config.yaml:94-117`) | Pattern reused: `language: system` or `language: script`, `pass_filenames: false`, scoped via `files:`. |
-| `act-deploy-web` pre-commit hook (`.pre-commit-config.yaml:138-143`) | Reused. The updated workflow will be re-verified through this hook on `act push`. |
+| `actionlint` pre-commit hook | The updated workflow YAML is statically validated on any change. |
 
 ## Logic
 
@@ -788,11 +786,8 @@ re-deploy.
   behavior (they show as one diff hunk per move).
 - **Lambda zip size**: unchanged. The `apps/api/openapi.json` is never
   shipped in the Lambda; it lives in the repo and the web build context.
-- **`act` testing of deploy_web**: removing the Rust install step
-  shortens local `act` runs by ~90 seconds. The existing
-  `.github/workflows/CLAUDE.md` rule "test the workflow with ACT" still
-  applies; the existing `act-deploy-web` pre-commit hook
-  (`.pre-commit-config.yaml:138-143`) handles this.
+- **Workflow validation**: `actionlint` (pre-commit hook) statically
+  validates `deploy_web.yml` after the Rust install step is removed.
 - **Web deploy on spec change**: today `deploy_web.yml` does not trigger
   on any `apps/api/**` path. After this change the same is still true
   for Rust source files (which is correct: behavior-only changes that do
@@ -820,18 +815,16 @@ layout of the existing `scripts/tests/git_hooks/test_trivy.sh`. Cases:
   hook exits (success and failure paths).
 
 The cargo binary is stubbed via a function override exported into the
-hook's `$PATH`, following the same `act() {...}; export -f act` pattern
-as `scripts/tests/test_act.sh:13-14`.
+hook's `$PATH`, following the standard bashunit pattern of defining a
+shell function and `export -f` to make it visible to the script under test.
 
 ### Integration
 
 - **`docker compose build web`** from a clean state: should succeed in
   under 90 seconds (vs the current state of failing entirely). Run as
   part of task 6 verification.
-- **`act` exercise of `deploy_web.yml`**: the existing `act-deploy-web`
-  pre-commit hook (`.pre-commit-config.yaml:138-143`) re-runs the
-  workflow locally. After the change, this must succeed without the
-  Rust install step.
+- **`actionlint` of `deploy_web.yml`**: the pre-commit hook statically
+  validates the workflow YAML after the Rust install step is removed.
 
 ### E2E
 
@@ -881,7 +874,7 @@ flowchart TD
     T3 --> T4[4. Update apps/web/Dockerfile]
     T3 --> T5[5. Update deploy_web.yml]
     T4 --> T6[6. Verify docker compose build web]
-    T5 --> T7[7. Verify deploy_web.yml via act]
+    T5 --> T7[7. Verify deploy_web.yml via actionlint]
     T2 --> T8[8. Documentation updates]
 ```
 
@@ -891,7 +884,7 @@ flowchart TD
 | 2 | API helper + drift hook    | Add `scripts/src/api.sh` exposing `gen_api_spec`. Source it from `scripts/src/includes.sh`. Add `scripts/src/git_hooks/check_openapi_spec_drift.sh` (sources `api.sh`) and `scripts/tests/git_hooks/test_check_openapi_spec_drift.sh`. Wire the `check-openapi-spec-drift` hook in `.pre-commit-config.yaml` scoped to `apps/api/**/*.rs` and `Cargo.{toml,lock}`. | `source scripts/src/includes.sh && gen_api_spec` regenerates `apps/api/openapi.json`. All four bashunit cases pass. Modifying a handler schema without regenerating fails pre-commit. Modifying only TS passes pre-commit. A failing cargo build produces a "cargo failed" error, not a drift error. | 1            |
 | 3 | Rewire codegen + turbo     | Replace cargo invocation in `apps/web/scripts/gen_api_client.sh`. Update `turbo.json`'s `gen:api-client` inputs to include `$TURBO_ROOT$/apps/api/openapi.json`. | `bun run build:web` succeeds without cargo on PATH (verifiable in a clean docker container)                                     | 1            |
 | 4 | Update web Dockerfile      | Add `COPY apps/api/openapi.json`, switch builder command to `bun run build:web`.                                                            | `docker compose build web` succeeds from a clean state                                                                          | 3            |
-| 5 | Update deploy_web workflow | Remove the `Install Rust toolchain` step and the `TOKENOVERFLOW_BUNDLED_LIBS` env from the `Build BFF` step. Add `apps/api/openapi.json` to the `paths:` filter. | Workflow YAML passes `actionlint`; `act-deploy-web` pre-commit hook passes                                                      | 3            |
+| 5 | Update deploy_web workflow | Remove the `Install Rust toolchain` step and the `TOKENOVERFLOW_BUNDLED_LIBS` env from the `Build BFF` step. Add `apps/api/openapi.json` to the `paths:` filter. | Workflow YAML passes `actionlint`.                                                                                              | 3            |
 | 6 | Verify docker path         | Run `docker compose build web` and `docker compose up web --wait` locally.                                                                  | Container reports healthy; `/health` returns 200                                                                                | 4            |
 | 7 | Verify CI path             | Trigger `deploy_web.yml` via `workflow_dispatch` on a branch and confirm green.                                                             | Workflow completes successfully without Rust install step                                                                       | 5            |
 | 8 | Docs                       | Append a "Spec sync" section to `apps/api/src/CLAUDE.md`; refresh `deploy_web.yml` comment block; update inline comment in `gen_api_client.sh`. | New contributor reading the doc understands when to regenerate the spec                                                         | 2            |

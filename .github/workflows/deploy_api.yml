@@ -31,7 +31,6 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Configure AWS credentials
-        if: ${{ !github.event.act }}
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7  # v6.0.0
         with:
           role-to-assume: ${{ secrets.AWS_IAM_ROLE_ARN }}
@@ -46,21 +45,19 @@ jobs:
         run: pip3 install --break-system-packages cargo-lambda
 
       - name: Install Session Manager plugin
-        if: ${{ !github.event.act }}
         uses: ankurk91/install-session-manager-plugin-action@bf762f2baff16807788bb3e3199da1a77f0b6666  # v1
 
       - name: Build Lambda artifact
         run: cargo lambda build -p tokenoverflow --release --arm64 --features bundled-libs
 
       - name: Establish SSM tunnel
-        if: ${{ !github.event.act }}
         env:
           TOKENOVERFLOW_RDS_TUNNEL_HOST: "main.ccp4e4gum1b0.us-east-1.rds.amazonaws.com"
           TOKENOVERFLOW_RDS_TUNNEL_PORT: "5432"
         run: |
           scripts/src/rds_tunnel.sh &
 
-          for i in {1..30}; do
+          for _ in {1..30}; do
             nc -z localhost 5432 2>/dev/null && exit 0
             sleep 1
           done
@@ -69,7 +66,6 @@ jobs:
           exit 1
 
       - name: Run database migrations
-        if: ${{ !github.event.act }}
         env:
           TOKENOVERFLOW_ENV: production
           TOKENOVERFLOW_CONFIG_DIR: apps/api/config
@@ -86,7 +82,6 @@ jobs:
           ./target/lambda/tokenoverflow/bootstrap --migrate
 
       - name: Deploy Lambda function
-        if: ${{ !github.event.act }}
         run: |
           SHA=$(shasum -a 256 target/lambda/tokenoverflow/bootstrap | cut -c1-12)
 

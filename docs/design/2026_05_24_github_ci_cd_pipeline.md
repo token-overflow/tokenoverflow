@@ -42,8 +42,7 @@ fast local feedback checks.
 - Remove the `turbo-test-e2e` pre-commit hook.
 - Update pre-commit coverage so it skips the e2e binary.
 - Keep all other pre-commit hooks, including unit and integration tests.
-- Add an `act-pr` pre-commit hook for the lightweight local `pr.yml` path.
-- Skip heavy CI steps under `act` with `if: ${{ env.ACT != 'true' }}`.
+- Add an `actionlint` pre-commit hook to statically validate workflow files.
 - Use GitHub Rulesets with only the `required` check enforced.
 - Pin all third-party actions by full commit SHA with a version comment.
 
@@ -389,10 +388,10 @@ fast local feedback checks.
 
 ### Pre-commit hooks to remove?
 
-#### ✅ Option 1: Drop only `turbo-test-e2e`; modify cargo_coverage.sh; add act-pr
+#### ✅ Option 1: Drop only `turbo-test-e2e`; modify cargo_coverage.sh; add actionlint
 
 - Description: Remove the heavy e2e hook; coverage script skips the e2e binary
-  locally; new hook validates the orchestrator via `act`.
+  locally; new hook statically validates workflow files via `actionlint`.
 - Pros: Keeps fast local checks intact; CI catches e2e regressions.
 - Cons: Need CI to run e2e for every relevant PR.
 - Rationale: Local feedback stays fast; merge safety moves to CI.
@@ -780,10 +779,9 @@ SHA and comment in lockstep.
 │   ├── deploy_*.yml                 # modified (consume new composite actions)
 │   ├── terraform.yml                # unchanged
 │   └── CLAUDE.md                    # unchanged
-├── act/event_pr.json                # new (used by act-pr hook)
 └── dependabot.yml                   # new
 docker-compose.yml                   # modified: add profiles + image-tag/repo substitution
-.pre-commit-config.yaml              # modified: drop turbo-test-e2e, add act-pr
+.pre-commit-config.yaml              # modified: drop turbo-test-e2e, add actionlint
 scripts/src/docker.sh                # modified: redeploy_local boots full stack via profiles
 scripts/src/git_hooks/cargo_coverage.sh  # modified: skip --test e2e
 apps/web/playwright.config.ts        # modified: wait-for-port preflight, retries: 1
@@ -1104,13 +1102,12 @@ No `pull-requests: write`. No `id-token: write`. `secrets: inherit` from
 `pr.yml`; today only `GITHUB_TOKEN` is auto-injected. Fork PRs never receive
 secrets; the fork cascade keeps secret-handling workflows unreachable.
 
-### `act` local validation
+### `actionlint` local validation
 
-- `act` sets `ACT=true` in its runner image. Heavy steps guard with
-  `if: ${{ env.ACT != 'true' }}`.
-- Minimum `act` version: 0.2.60+ (for `workflow_call` support).
-- Under `act-pr`, the orchestrator exercises prepare + fast bucket only;
-  `docker_build` and `e2e_test` are gated entirely by `env.ACT != 'true'`.
+- `actionlint` statically checks workflow YAML, expression syntax,
+  job/step references, matrix inputs, and shell snippets.
+- Hook runs on any change under `.github/workflows/`.
+- Pinned by SHA in `.pre-commit-config.yaml`.
 
 ### Timeouts (per reusable workflow job)
 
@@ -1166,13 +1163,9 @@ after two weeks of green data.
   first-run model download is the long tail.
 - **GHA cache 10 GB cap**: Bun (~hundreds of MB) + rust-cache (~2-3 GB) +
   Playwright (~400 MB). Comfortably under cap.
-- **`act` local validation**: hook runs
-
-  ```bash
-  act pull_request -W .github/workflows/pr.yml \
-    -e .github/act/event_pr.json --secret-file .act.secrets
-  ```
-
+- **`actionlint` local validation**: pre-commit hook runs `actionlint` over
+  `.github/workflows/**` on change. Catches syntax, expression, and matrix
+  input mistakes in ~100ms.
 - **Branch protection lock-in**: `required` is stable; renaming reusables does
   not require ruleset updates.
 - **Compose profile default is empty**: `docker compose up` boots nothing;
@@ -1188,8 +1181,8 @@ after two weeks of green data.
 
 ### Acceptance scenarios
 
-1. **`act-pr` local smoke**: orchestrator parses; fast bucket runs; heavy steps
-   skipped via `env.ACT != 'true'`.
+1. **`actionlint` local smoke**: every workflow under `.github/workflows/`
+   parses with zero diagnostics.
 2. **Empty PR (README.md only)**: markdown_lint runs; `required` green.
 3. **Ignored-only PR (.idea/** only)\*\*: every reusable skipped; `required`
    green; under 2 minutes.
@@ -1292,8 +1285,8 @@ after two weeks of green data.
 
 - `prek run --verbose` shows no `turbo-test-e2e`. Coverage hook does not invoke
   the e2e binary.
-- Edit `.github/workflows/pr.yml` and commit; `act-pr` runs and reports parse
-  success.
+- Edit `.github/workflows/pr.yml` and commit; `actionlint` runs and reports
+  zero diagnostics.
 
 #### Task 12: Playwright configs
 
@@ -1339,13 +1332,8 @@ after two weeks of green data.
 
 - `.pre-commit-config.yaml`:
     - Drop the `turbo-test-e2e` hook.
-    - Add `act-pr` hook scoped to new workflows and `.github/actions/**`,
-      running:
-
-      ```bash
-      act pull_request -W .github/workflows/pr.yml \
-        -e .github/act/event_pr.json --secret-file .act.secrets
-      ```
+    - Add `actionlint-system` hook (pinned to `rhysd/actionlint` v1.7.12)
+      that fires on any change under `.github/workflows/`.
 
 - `scripts/src/git_hooks/cargo_coverage.sh`: drop `--test e2e` from the
   `cargo +nightly llvm-cov` invocation. Becomes:
@@ -1405,7 +1393,7 @@ flowchart TD
     T5 --> T8[8. lhci.yml wired into pr.yml]
     T7 --> T9[9. prune_pr_cache.yml]
     T7 --> T10[10. Simplify docker cache<br/>~~tag_main_cache.yml~~]
-    T5 --> T11[11. Trim pre-commit<br/>drop turbo-test-e2e,<br/>modify cargo_coverage.sh,<br/>add act-pr]
+    T5 --> T11[11. Trim pre-commit<br/>drop turbo-test-e2e,<br/>modify cargo_coverage.sh,<br/>add actionlint]
     T7 --> T12[12. Playwright configs<br/>wait-for-port + retries:1]
     T2 --> T13[13. dependabot.yml]
     T9 --> T14[14. Rulesets with required check]
@@ -1417,16 +1405,16 @@ flowchart TD
 | #   | Task Name                                                                   | Task Description                                                                                                                                                                                                                                                                                                                      | Success Criteria                                                                                                                                                                                                                          | Dependencies |
 | --- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
 | 1   | Compose profiles + redeploy_local                                           | Modify `docker-compose.yml` to add `profiles:` per service and the `image: ghcr.io/${TOKENOVERFLOW_IMAGE_REPO:-tokenoverflow/tokenoverflow}/<service>:${TOKENOVERFLOW_IMAGE_TAG:-latest}` substitution. Update `scripts/src/docker.sh::redeploy_local` to boot the full stack via profiles. Update docs that say `docker compose up`. | `docker compose up` with no profile boots nothing; `redeploy_local` boots full stack healthy in 60s; `TOKENOVERFLOW_IMAGE_TAG=test TOKENOVERFLOW_IMAGE_REPO=test/repo docker compose --profile api config` shows `test/repo` and `:test`. | none         |
-| 2   | Composite actions + migrate deploy workflows                                | Add `bun_install`, `rust_toolchain`, `docker_compose_up`, `playwright_install`. Migrate deploy workflows to consume them. Verify `cargo lambda build --features bundled-libs` interaction with `Swatinem/rust-cache`.                                                                                                                 | Deploy workflows produce identical artifacts and remain green. `act-deploy_*` hooks pass.                                                                                                                                                 | 1            |
+| 2   | Composite actions + migrate deploy workflows                                | Add `bun_install`, `rust_toolchain`, `docker_compose_up`, `playwright_install`. Migrate deploy workflows to consume them. Verify `cargo lambda build --features bundled-libs` interaction with `Swatinem/rust-cache`.                                                                                                                 | Deploy workflows produce identical artifacts and remain green.                                                                                                                                                                            | 1            |
 | 3   | lint.yml with all jobs                                                      | Add `lint.yml` with the nine parallel jobs from Interfaces. Each job path-gated via inputs from `pr.yml`.                                                                                                                                                                                                                             | Each sub-job runs green via `workflow_dispatch`. Each uses the same binary as the equivalent pre-commit hook.                                                                                                                             | 2            |
 | 4   | type_check + unit_test + integration_test + security_audit reusables        | Add the four reusables. `unit_test.yml` multi-job (vitest_unit + cargo_test_unit + bashunit). `security_audit.yml` multi-job (trivy + cargo_audit + bun_audit, two-pass).                                                                                                                                                             | Each runs green via `workflow_dispatch`. `trivy fs --severity HIGH,CRITICAL` and `bashunit` match the pre-commit hooks.                                                                                                                   | 2            |
-| 5   | pr.yml orchestrator (fast bucket only)                                      | Add `pr.yml` with `on: pull_request`, `prepare` job, dispatches to the five fast-bucket reusables with per-surface gating, and the `required` aggregator. Add `.github/act/event_pr.json`.                                                                                                                                            | Docs-only PR: markdown_lint runs; ignored-only PR: every reusable skipped, `required` green. TS-only PR: right subset runs.                                                                                                               | 3, 4         |
+| 5   | pr.yml orchestrator (fast bucket only)                                      | Add `pr.yml` with `on: pull_request`, `prepare` job, dispatches to the five fast-bucket reusables with per-surface gating, and the `required` aggregator.                                                                                                                                                                             | Docs-only PR: markdown_lint runs; ignored-only PR: every reusable skipped, `required` green. TS-only PR: right subset runs.                                                                                                               | 3, 4         |
 | 6   | docker_build wired into pr.yml                                              | Add `docker_build.yml` with the unconditional 5-image matrix. Wire into `pr.yml` with fork-PR exemption. Tag publish via `docker/metadata-action` (`:pr-N` on PR, `:main` on `push: main`); `cache-from = :buildcache + :buildcache-pr-N`; `cache-to` writes `:buildcache-pr-N` on PRs and `:buildcache` on `push: main`.              | A Rust PR produces all five `:pr-N` images. Fork PR builds without pushing. `push: main` overwrites `:main` and refreshes `:buildcache` for every image.                                                                                  | 5            |
 | 7   | e2e_test.yml matrix wired into pr.yml                                       | Add `e2e_test.yml` with `matrix: [api, landing, web]`, using `docker_compose_up`. api leg runs `cargo test --test e2e -- --test-threads=1`. Action sets `TOKENOVERFLOW_IMAGE_TAG` and `TOKENOVERFLOW_IMAGE_REPO` before compose.                                                                                                      | All three legs run green. Artifacts uploaded. `up` uses `--no-build`.                                                                                                                                                                     | 6            |
 | 8   | lhci.yml wired into pr.yml                                                  | Add `lhci.yml` reusable running `bun run --filter=@tokenoverflow/landing test:lhci`. Gate on `landing` or `workflows`. Add to `required` aggregator gated behind `landing` or `workflows`.                                                                                                                                            | Landing PR runs `lhci` green; non-landing PR skips `lhci`. Budget regression turns `lhci` red.                                                                                                                                            | 5            |
 | 9   | prune_pr_cache.yml                                                          | Add the workflow. Closing a PR deletes both `:pr-N` and `:buildcache-pr-N` tags.                                                                                                                                                                                                                                                      | Closing a probe PR removes both tag families within minutes.                                                                                                                                                                              | 7            |
 | 10  | ~~tag_main_cache.yml~~ Simplify docker cache                                | Implementation diverged from initial design; see PR for the simpler architecture that replaces both `docker_build.yml`'s cache scheme (now `:buildcache` + `:buildcache-pr-N`) and removes `tag_main_cache.yml` (replaced by `docker_build.yml`'s own `push: main` trigger).                                                          | A merge to `main` rebuilds every image and refreshes `:buildcache`; closing a PR drops `:buildcache-pr-N`.                                                                                                                                | 7            |
-| 11  | Trim pre-commit (drop turbo-test-e2e, modify cargo_coverage.sh, add act-pr) | (a) Remove `turbo-test-e2e`. (b) Edit `cargo_coverage.sh` to drop `--test e2e`. (c) Add `act-pr` hook scoped to new workflow + composite action files.                                                                                                                                                                                | Pre-commit no longer boots compose for e2e; cargo-coverage skips the e2e binary; editing `pr.yml` triggers `act-pr`.                                                                                                                      | 5            |
+| 11  | Trim pre-commit (drop turbo-test-e2e, modify cargo_coverage.sh, add actionlint) | (a) Remove `turbo-test-e2e`. (b) Edit `cargo_coverage.sh` to drop `--test e2e`. (c) Add `actionlint-system` hook scoped to `.github/workflows/`.                                                                                                                                                                                | Pre-commit no longer boots compose for e2e; cargo-coverage skips the e2e binary; editing `pr.yml` triggers `actionlint`.                                                                                                                  | 5            |
 | 12  | Playwright configs                                                          | Drop `webServer` from web config, add wait-for-port preflight, set `retries: process.env.CI ? 1 : 0` on both.                                                                                                                                                                                                                         | Local run against not-up stack prints the helpful error; CI retries one transient failure per spec.                                                                                                                                       | 7            |
 | 13  | dependabot.yml                                                              | Configure github-actions updates with weekly schedule and grouped PRs for workflows and each composite action directory (4 dirs).                                                                                                                                                                                                     | Dependabot opens a bump PR within 7 days of a new action SHA. PR bumps SHA + comment in lockstep.                                                                                                                                         | 2            |
 | 14  | Rulesets with single `required` check                                       | Add Settings > Rules > Rulesets entry targeting `main`. Required check: only `required`. Verify with a deliberately-failing PR.                                                                                                                                                                                                       | A PR that intentionally fails lint is blocked; fix unblocks. The ruleset lists only `required`.                                                                                                                                           | 8, 9, 10, 12 |
