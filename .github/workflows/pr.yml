@@ -48,54 +48,45 @@ jobs:
         id: filter
         uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36  # v3.0.2
         with:
+          # dorny/paths-filter evaluates each list entry as an independent
+          # picomatch pattern and OR's the results, so a standalone negation
+          # like '!**/*.md' fires as a positive match on every non-`.md` file.
+          # Embed the negation as an extglob suffix on the parent path instead
+          # so it constrains that one pattern's filename match.
+          # `integrations/**` is intentionally broad: api Dockerfile COPYs
+          # `integrations/claude/instructions.md` into the build context.
           filters: |
             rust:
-              - 'apps/api/**'
-              - 'apps/embedding_service/**'
-              - 'apps/so_tag_sync/**'
+              - 'apps/api/**/!(*.md|*.mdx)'
+              - 'apps/embedding_service/**/!(*.md|*.mdx)'
+              - 'apps/so_tag_sync/**/!(*.md|*.mdx)'
               - 'integrations/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
-              - '!**/*.md'
-              - '!**/*.mdx'
             ts:
-              - 'apps/web/**'
-              - 'apps/landing/**'
-              - 'packages/**'
+              - 'apps/web/**/!(*.md|*.mdx)'
+              - 'apps/landing/**/!(*.md|*.mdx)'
+              - 'packages/**/!(*.md|*.mdx)'
               - 'apps/api/openapi.json'
               - 'package.json'
               - 'bun.lock'
               - 'bunfig.toml'
               - 'turbo.json'
-              - '!**/*.md'
-              - '!**/*.mdx'
             landing:
-              - 'apps/landing/**'
-              - '!**/*.md'
-              - '!**/*.mdx'
+              - 'apps/landing/**/!(*.md|*.mdx)'
             web:
-              - 'apps/web/**'
-              - '!**/*.md'
-              - '!**/*.mdx'
+              - 'apps/web/**/!(*.md|*.mdx)'
             api:
-              - 'apps/api/**'
-              - '!**/*.md'
-              - '!**/*.mdx'
+              - 'apps/api/**/!(*.md|*.mdx)'
             embedding:
-              - 'apps/embedding_service/**'
-              - '!**/*.md'
-              - '!**/*.mdx'
+              - 'apps/embedding_service/**/!(*.md|*.mdx)'
             docker:
               - 'docker-compose.yml'
               - 'apps/*/Dockerfile'
-              - 'infra/docker/**'
-              - '!**/*.md'
-              - '!**/*.mdx'
+              - 'infra/docker/**/!(*.md|*.mdx)'
             workflows:
-              - '.github/workflows/**'
-              - '.github/actions/**'
-              - '!**/*.md'
-              - '!**/*.mdx'
+              - '.github/workflows/**/!(*.md|*.mdx)'
+              - '.github/actions/**/!(*.md|*.mdx)'
             terraform:
               - 'terraform/**'
               - '**/*.tf'
