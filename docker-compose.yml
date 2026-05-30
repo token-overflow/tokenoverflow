@@ -34,7 +34,8 @@ services:
     profiles: [api, web]
     working_dir: /volume
     volumes:
-      - ./apps/api:/volume
+      - ./apps/api/migrations:/volume/migrations:ro
+      - ./apps/api/diesel.toml:/volume/diesel.toml:ro
     environment:
       DATABASE_URL: postgres://tokenoverflow:localdev@postgres:5432/tokenoverflow
     depends_on:
