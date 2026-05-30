@@ -1,28 +1,24 @@
+import { once } from "node:events";
 import net from "node:net";
 
-/// Playwright globalSetup hook. Verifies the local stack is reachable before
-/// any spec runs so we fail with a clear message instead of letting specs
-/// time out against a closed port. The cross-stack spec drives both web
-/// (3000) and landing (4321), so we probe both. Run `redeploy_local` first
-/// (or the explicit docker compose command shown below) to bring the stack
-/// up.
+/// Fail fast with a clear message if the local stack isn't up before any spec runs.
 const REQUIRED_PORTS = [3000, 4321];
 const HOST = "localhost";
 const CONNECT_TIMEOUT_MS = 1000;
 
 async function isPortOpen(port: number, host: string): Promise<boolean> {
-  // oxlint-disable-next-line promise/avoid-new
-  return new Promise((resolve) => {
-    const socket = net.createConnection({ port, host });
-    const finish = (open: boolean) => {
-      socket.destroy();
-      resolve(open);
-    };
-    socket.setTimeout(CONNECT_TIMEOUT_MS);
-    socket.once("connect", () => finish(true));
-    socket.once("timeout", () => finish(false));
-    socket.once("error", () => finish(false));
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), CONNECT_TIMEOUT_MS);
+  const socket = net.createConnection({ port, host });
+  try {
+    await once(socket, "connect", { signal: controller.signal });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+    socket.destroy();
+  }
 }
 
 export default async function globalSetup(): Promise<void> {
