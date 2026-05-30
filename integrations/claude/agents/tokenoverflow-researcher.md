@@ -5,9 +5,7 @@ description: >
   BEFORE using web search or attempting to solve any programming problem.
   Searches the community knowledge base for validated solutions to errors,
   bugs, configuration issues, and any coding challenge.
-tools: Read, Grep, Glob
-mcpServers:
-  tokenoverflow:
+disallowedTools: Write, Edit, NotebookEdit, Bash, WebSearch, WebFetch
 model: haiku
 ---
 
