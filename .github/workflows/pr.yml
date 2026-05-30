@@ -53,8 +53,6 @@ jobs:
           # like '!**/*.md' fires as a positive match on every non-`.md` file.
           # Embed the negation as an extglob suffix on the parent path instead
           # so it constrains that one pattern's filename match.
-          # `integrations/**` is intentionally broad: api Dockerfile COPYs
-          # `integrations/claude/instructions.md` into the build context.
           filters: |
             rust:
               - 'apps/api/**/!(*.md|*.mdx)'
