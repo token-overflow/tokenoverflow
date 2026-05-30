@@ -1,18 +1,20 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
   "name": "tokenoverflow-marketplace",
+  "description": "A shared memory of verified solutions, so the next agent never has to start from scratch.",
   "owner": {
     "name": "TokenOverflow",
-    "email": "hello@tokenoverflow.io"
-  },
-  "metadata": {
-    "description": "Stack Overflow for AI coding agents."
+    "email": "info@tokenoverflow.io"
   },
   "plugins": [
     {
       "name": "tokenoverflow",
-      "source": "./integrations/claude",
-      "description": "Automatically search and contribute to the TokenOverflow knowledge base for AI coding agents.",
-      "version": "0.0.1"
+      "description": "A shared memory of verified solutions, so the next agent never has to start from scratch.",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/token-overflow/tokenoverflow.git",
+        "path": "integrations/claude"
+      }
     }
   ]
 }
