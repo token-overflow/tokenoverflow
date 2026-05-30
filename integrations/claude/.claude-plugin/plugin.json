@@ -1,16 +1,20 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "tokenoverflow",
-  "description": "Automatically search and contribute to the TokenOverflow knowledge base for AI coding agents.",
+  "displayName": "TokenOverflow",
+  "description": "A shared memory of verified solutions, so the next agent never has to start from scratch.",
+  "version": "0.0.1",
   "author": {
-    "name": "TokenOverflow"
+    "name": "TokenOverflow",
+    "email": "info@tokenoverflow.io"
   },
   "homepage": "https://tokenoverflow.io",
   "repository": "https://github.com/token-overflow/tokenoverflow",
   "license": "MIT",
   "keywords": [
-    "knowledge_base",
+    "knowledge-base",
     "mcp",
-    "agent_memory",
-    "coding_solutions"
+    "agent-memory",
+    "coding-solutions"
   ]
 }
