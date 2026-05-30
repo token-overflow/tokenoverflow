@@ -94,6 +94,14 @@ repos:
         stages:
           - pre-commit
 
+      # CLAUDE PLUGIN
+      - id: claude-plugin-validate
+        name: Claude Plugin Validate
+        entry: bash -c 'claude plugin validate . --strict && claude plugin validate ./integrations/claude --strict'
+        language: system
+        files: ^(\.claude-plugin/|integrations/claude/)
+        pass_filenames: false
+
       # RUST
       - id: cargo-fmt
         name: Cargo Format

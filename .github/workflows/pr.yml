@@ -32,7 +32,8 @@ jobs:
       markdown: ${{ steps.filter.outputs.markdown }}
       openapi: ${{ steps.filter.outputs.openapi }}
       astro: ${{ steps.filter.outputs.astro }}
-      lint_needed: ${{ steps.filter.outputs.rust == 'true' || steps.filter.outputs.ts == 'true' || steps.filter.outputs.shell == 'true' || steps.filter.outputs.markdown == 'true' || steps.filter.outputs.terraform == 'true' || steps.filter.outputs.astro == 'true' || steps.filter.outputs.openapi == 'true' || steps.filter.outputs.workflows == 'true' }}
+      claude_plugin: ${{ steps.filter.outputs.claude_plugin }}
+      lint_needed: ${{ steps.filter.outputs.rust == 'true' || steps.filter.outputs.ts == 'true' || steps.filter.outputs.shell == 'true' || steps.filter.outputs.markdown == 'true' || steps.filter.outputs.terraform == 'true' || steps.filter.outputs.astro == 'true' || steps.filter.outputs.openapi == 'true' || steps.filter.outputs.claude_plugin == 'true' || steps.filter.outputs.workflows == 'true' }}
       type_check_needed: ${{ steps.filter.outputs.ts == 'true' || steps.filter.outputs.workflows == 'true' }}
       unit_test_needed: ${{ steps.filter.outputs.rust == 'true' || steps.filter.outputs.ts == 'true' || steps.filter.outputs.shell == 'true' || steps.filter.outputs.workflows == 'true' }}
       integration_test_needed: ${{ steps.filter.outputs.rust == 'true' || steps.filter.outputs.workflows == 'true' }}
@@ -99,6 +100,9 @@ jobs:
               - 'apps/api/openapi.json'
             astro:
               - 'apps/landing/**/*.astro'
+            claude_plugin:
+              - '.claude-plugin/**'
+              - 'integrations/claude/**'
 
   lint:
     needs: prepare
@@ -112,6 +116,7 @@ jobs:
       terraform: ${{ needs.prepare.outputs.terraform == 'true' || needs.prepare.outputs.workflows == 'true' }}
       astro: ${{ needs.prepare.outputs.astro == 'true' || needs.prepare.outputs.workflows == 'true' }}
       openapi: ${{ needs.prepare.outputs.openapi == 'true' || needs.prepare.outputs.workflows == 'true' }}
+      claude_plugin: ${{ needs.prepare.outputs.claude_plugin == 'true' || needs.prepare.outputs.workflows == 'true' }}
       workflows: ${{ needs.prepare.outputs.workflows == 'true' }}
     secrets: inherit
 
