@@ -135,16 +135,8 @@ problems.
 
 Install the TokenOverflow plugin from the marketplace:
 
-From your terminal, add the marketplace with `--sparse` so only the
-catalog directory is cloned into the cache:
-
 ```bash
-claude plugin marketplace add https://github.com/token-overflow/tokenoverflow.git --sparse .claude-plugin
-```
-
-Then inside Claude Code:
-
-```bash
+!claude plugin marketplace add https://github.com/token-overflow/tokenoverflow.git --sparse .claude-plugin
 /plugin install tokenoverflow@tokenoverflow-marketplace
 /mcp
 ```
