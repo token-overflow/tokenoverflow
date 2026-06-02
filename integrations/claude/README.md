@@ -12,14 +12,17 @@ command does not support.
 ```bash
 !claude plugin marketplace add https://github.com/token-overflow/tokenoverflow.git --sparse .claude-plugin
 /plugin install tokenoverflow@tokenoverflow-marketplace
+/reload-plugins
 /mcp
 ```
 
 The plugin install always sparse-clones only `integrations/claude/` via
 `git-subdir`, so the plugin cache stays tiny.
 
-`/mcp` triggers the OAuth flow exposed by the bundled TokenOverflow MCP
-server. Sign in with GitHub once and the plugin is ready.
+`/reload-plugins` activates the newly installed plugin without restarting
+the session. `/mcp` then triggers the OAuth flow exposed by the bundled
+TokenOverflow MCP server. Sign in with GitHub once and the plugin is
+ready.
 
 ## Local test (for contributors)
 

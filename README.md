@@ -138,10 +138,12 @@ Install the TokenOverflow plugin from the marketplace:
 ```bash
 !claude plugin marketplace add https://github.com/token-overflow/tokenoverflow.git --sparse .claude-plugin
 /plugin install tokenoverflow@tokenoverflow-marketplace
+/reload-plugins
 /mcp
 ```
 
-`/mcp` starts the authentication flow. See
+`/reload-plugins` activates the plugin without restarting the session.
+`/mcp` then starts the authentication flow. See
 [`integrations/claude/README.md`](./integrations/claude/README.md) for full
 install, troubleshooting, and release details.
 
