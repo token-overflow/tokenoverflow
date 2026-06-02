@@ -49,8 +49,9 @@ References: brief at `docs/brief/2026_01_31_tokenoverflow.md`, plugin source at
    workflow so contributors who bypass pre-commit (or open PRs without
    local hooks installed) are still caught.
 5. End-user installation instructions in the root `README.md` and in
-   `integrations/claude/README.md`, including the recommended `--sparse`
-   flag for the marketplace add.
+   `integrations/claude/README.md`, documenting both the slash-command
+   form (default) and the terminal CLI form with `--sparse` (optional
+   lean marketplace cache).
 
 ## Out of Scope
 
@@ -107,7 +108,7 @@ inside the TokenOverflow monorepo). Two fetches happen on the user's machine:
 
 The question is the plugin source pattern and how we minimize both fetches.
 
-#### ✅ Option 1: Same repo, `git-subdir` source + documented `--sparse`
+#### ✅ Option 1: Same repo, `git-subdir` + terminal CLI `--sparse` default
 
 `.claude-plugin/marketplace.json` at the monorepo root references the plugin
 via `git-subdir`:
@@ -123,23 +124,35 @@ via `git-subdir`:
 }
 ```
 
-End users add the marketplace with `--sparse .claude-plugin` so the
-marketplace add only checks out the catalog directory:
+End users add the marketplace via the slash command:
 
 ```bash
-/plugin marketplace add token-overflow/tokenoverflow --sparse .claude-plugin
+/plugin marketplace add https://github.com/token-overflow/tokenoverflow.git
 /plugin install tokenoverflow@tokenoverflow-marketplace
 ```
 
 The plugin install itself sparse-clones only `integrations/claude/` via
-`git-subdir`, regardless of how the user added the marketplace.
+`git-subdir`, regardless of how the user added the marketplace. So the
+plugin cache footprint stays around ~50 KB even when the marketplace
+cache holds the full repo.
+
+Users who care about marketplace cache size can run the terminal CLI
+equivalent, which supports `--sparse`:
+
+```bash
+claude plugin marketplace add https://github.com/token-overflow/tokenoverflow.git --sparse .claude-plugin
+```
+
+This drops the marketplace cache to ~1 MB (root files + `.claude-plugin/`).
+The `--sparse` flag is not accepted by the `/plugin marketplace add` slash
+command parser at this writing, so the lean path is documented as an
+optional terminal one-liner rather than the default.
 
 **Pros:**
 - One repo, one PR per change. No release coordination across two repos.
-- Both fetches stay small when users follow the documented command. The
-  marketplace add scopes its clone to the `.claude-plugin/` tree plus the
-  root-level files (`git sparse-checkout` always includes the repo root).
-  The plugin install pulls only `integrations/claude/` via `git-subdir`.
+- Plugin install always lean: `git-subdir` fetches only `integrations/claude/`
+  (~50 KB) regardless of how the marketplace was added.
+- Marketplace cache can also be lean via the documented CLI form (~1 MB).
 - Matches the upstream production pattern used by Amplitude
   (`amplitude/mcp-marketplace.git`, path `plugins/amplitude`) and Bigdata in
   the official Anthropic catalog.
@@ -147,15 +160,14 @@ The plugin install itself sparse-clones only `integrations/claude/` via
   relative-path install, so existing hook commands keep working.
 
 **Cons:**
-- Users who forget `--sparse` clone the whole monorepo for the marketplace
-  add. Bandwidth-only cost (no behavioral impact). Documented prominently in
-  the install snippet and `integrations/claude/README.md`.
+- Default slash-command install clones the full monorepo into the
+  marketplace cache (tens of MB, bandwidth-only cost; install still works).
+  The lean CLI form is documented for users who care.
 - Requires the plugin to be self-contained inside `integrations/claude/` (no
   references outside the dir). We fix this anyway under Decision 3.
 
-The upstream-blessed pattern for monorepo plugins combined with the
-upstream-recommended `--sparse` flag for the marketplace add. A second repo
-is not yet worth the maintenance cost.
+The upstream-blessed pattern for monorepo plugins. A second repo is not yet
+worth the maintenance cost.
 
 #### ❌ Option 2: Same repo, relative path source
 
@@ -476,13 +488,17 @@ once Tasks 1-7 land.
 ```
 End User                       Claude Code                          GitHub
    |                                |                                  |
-   | /plugin marketplace add        |                                  |
-   |   token-overflow/tokenoverflow |                                  |
-   |   --sparse .claude-plugin      |                                  |
+   | (terminal)                     |                                  |
+   | claude plugin marketplace add  |                                  |
+   |   https://github.com/         |                                  |
+   |   token-overflow/             |                                  |
+   |   tokenoverflow.git           |                                  |
+   |   --sparse .claude-plugin     |                                  |
    |------------------------------->| sparse clone .claude-plugin/     |
    |                                |--------------------------------->|
    |                                |<--- marketplace.json -----------|
    |                                |                                  |
+   | (in Claude Code)               |                                  |
    | /plugin install                |                                  |
    |   tokenoverflow@               |                                  |
    |   tokenoverflow-marketplace    |                                  |
@@ -661,17 +677,31 @@ per the docs.
 
 ### End-user install commands
 
-The recommended snippet for the README and the plugin's README:
+Default snippet for the README and the plugin's README. The marketplace
+add uses the terminal CLI form so `--sparse` keeps the cache lean
+(~1 MB); the install + OAuth happen inside Claude Code:
 
 ```bash
-# Add the marketplace catalog. Sparse-clones only .claude-plugin/.
-/plugin marketplace add token-overflow/tokenoverflow --sparse .claude-plugin
+# Terminal: add the marketplace catalog. Sparse-clones only .claude-plugin/.
+claude plugin marketplace add https://github.com/token-overflow/tokenoverflow.git --sparse .claude-plugin
+```
 
-# Install the plugin. Sparse-clones only integrations/claude/ via git-subdir.
+```bash
+# Inside Claude Code: install the plugin and authenticate.
 /plugin install tokenoverflow@tokenoverflow-marketplace
-
-# Complete the OAuth flow exposed by the bundled MCP server.
 /mcp
+```
+
+The plugin install always sparse-clones only `integrations/claude/` via
+`git-subdir`, regardless of how the marketplace was added, so the plugin
+cache footprint stays ~50 KB.
+
+Users who prefer to stay inside Claude Code can use the slash command form
+for the marketplace add too; it does not accept `--sparse`, so the
+marketplace cache holds the full repo (tens of MB; install still works):
+
+```bash
+/plugin marketplace add https://github.com/token-overflow/tokenoverflow.git
 ```
 
 When the plugin is later accepted into
@@ -700,7 +730,7 @@ claude plugin validate ./integrations/claude --strict
 | `integrations/common/instructions.md`        | Exists            | Move into `integrations/claude/` as a real file (replacing the existing symlink). Delete `integrations/common/`. |
 | `apps/api/src/mcp/server.rs`                 | Exists            | Update `include_str!` on line 41 to point at `integrations/claude/instructions.md`. |
 | `apps/api/Dockerfile`                        | Exists            | Update the two `COPY integrations/common` lines (25 and 46) to copy from `integrations/claude/`. |
-| `README.md` install snippet                  | Exists            | Add `--sparse .claude-plugin` to the marketplace add command.                |
+| `README.md` install snippet                  | Exists            | Use the terminal CLI form (`claude plugin marketplace add ... --sparse .claude-plugin`) for the marketplace add so the cache stays lean; install + OAuth via slash command. Link to plugin README for details. |
 | `integrations/claude/README.md`              | Missing           | Add. Documents install, OAuth, troubleshooting, and release flow.            |
 | `.pre-commit-config.yaml`                    | Exists            | Add a `claude-plugin-validate` hook under the `repo: local` block, gated on `^(\.claude-plugin/\|integrations/claude/)`. Validator chained inline with `bash -c '... && ...'`. |
 | `.github/workflows/pr.yml`                   | Exists            | Add a `claude_plugin` path-filter output (mirrors the pre-commit `files:` regex), thread it through `lint_needed`, and pass it as a new `claude_plugin` input to the `lint` reusable. |
@@ -793,12 +823,17 @@ straight from GitHub by Claude Code.
 
 ## Edge Cases & Constraints
 
-- **Marketplace add without `--sparse`.** Users who run the bare
-  `/plugin marketplace add token-overflow/tokenoverflow` clone the whole
-  monorepo just for `.claude-plugin/marketplace.json`. The install still
-  works; it is purely a bandwidth cost on first add and on auto-update. We
-  document `--sparse .claude-plugin` in the install snippet and in
-  `integrations/claude/README.md` to nudge users to the lean path.
+- **Slash command does not support `--sparse`.** The `/plugin marketplace add`
+  slash command parser treats `--sparse` as part of the marketplace
+  identifier; only the standalone `claude plugin marketplace add` CLI form
+  accepts the flag. Both READMEs default to the CLI form so the marketplace
+  cache stays ~1 MB. Users who prefer the slash-command flow still get a
+  working install; the only cost is a full-repo marketplace cache (tens of
+  MB, bandwidth-only).
+- **`owner/repo` shorthand defaults to SSH.** The shorthand
+  (`token-overflow/tokenoverflow`) clones via `git@github.com:...`, which
+  fails for users without GitHub SSH keys configured. Both READMEs use the
+  full HTTPS URL form to avoid this entirely.
 - **Reserved marketplace names.** `tokenoverflow-marketplace` is not on the
   reserved list (`claude-code-marketplace`, `claude-plugins-official`, etc.,
   per docs). Cannot impersonate official names; we do not.
@@ -875,22 +910,31 @@ None. The change is configuration, not code.
 
 ### E2E tests
 
-- **Public install dry run**: from a clean machine, run
-  `/plugin marketplace add token-overflow/tokenoverflow --sparse .claude-plugin`
-  then `/plugin install tokenoverflow@tokenoverflow-marketplace`. Verify:
+- **Public install dry run (default lean path)**: from a clean machine,
+  run
+
+  ```bash
+  claude plugin marketplace add https://github.com/token-overflow/tokenoverflow.git --sparse .claude-plugin
+  ```
+
+  in a terminal, then `/plugin install tokenoverflow@tokenoverflow-marketplace`
+  inside Claude Code. Verify:
   1. The marketplace add succeeds and lists one plugin. The on-disk clone at
      `~/.claude/plugins/marketplaces/tokenoverflow-marketplace/` contains
-     only `.claude-plugin/`.
-  2. The install sparse-clones only `integrations/claude/` into the cache.
+     only `.claude-plugin/` plus root files (~1 MB total).
+  2. The plugin install sparse-clones only `integrations/claude/` into the
+     cache (~50 KB).
   3. `/mcp` triggers the OAuth flow.
   4. After login, `search_questions` succeeds against
      `https://api.tokenoverflow.io/mcp`.
   5. `SessionStart` hook output contains the contents of
      `instructions.md`.
   6. `PostToolUse` hook reminders fire after `WebSearch`.
-- **Public install without `--sparse`** (regression coverage). Same flow
-  without the flag. Verify install still succeeds; the only difference is a
-  fuller marketplace clone.
+- **Slash-command marketplace add (alternative path)**: same flow but the
+  marketplace add runs as the slash command
+  `/plugin marketplace add https://github.com/token-overflow/tokenoverflow.git`
+  from inside Claude Code. Verify install still succeeds; the marketplace
+  cache holds the full repo (tens of MB instead of ~1 MB).
 - **Pre-commit blocks broken commits**: stage a malformed
   `marketplace.json` (e.g. trailing comma). `git commit` must fail with a
   schema error from the validate hook.
@@ -908,9 +952,10 @@ None. The change is configuration, not code.
 
 ## Documentation Changes
 
-1. **Root `README.md`**: update the install snippet to include
-   `--sparse .claude-plugin` and add a one-line note on the lean-clone
-   behavior so contributors understand why the install footprint is small.
+1. **Root `README.md`**: replace the install snippet with the terminal CLI
+   form (`claude plugin marketplace add ... --sparse .claude-plugin`) for
+   the marketplace add, then the slash command for install + `/mcp`. Link
+   to `integrations/claude/README.md` for full details.
 2. **`integrations/claude/README.md`** (new): install instructions, local
    test instructions for development (`--plugin-dir` via the existing
    `claude_plugin` / `claude_local` scripts), release flow (version bump,
@@ -947,8 +992,8 @@ work.
 | 3 | Switch marketplace source to `git-subdir` | Update `.claude-plugin/marketplace.json`: replace the relative `source` with a `git-subdir` block pointing at `integrations/claude`, drop the legacy `metadata` wrapper and promote `description` to the top level, remove the plugin-entry `version` field, add `$schema`. | `claude plugin validate .` passes with `--strict`. End-to-end install from `token-overflow/tokenoverflow` sparse-clones only `integrations/claude/`. | 1 |
 | 4 | Add version + display name to `plugin.json` | Set `version: "0.0.1"`, `displayName: "TokenOverflow"`, `$schema`. | `claude plugin validate ./integrations/claude --strict` passes. `/plugin` UI shows "TokenOverflow" with version `0.0.1`. | 1, 2 |
 | 5 | Pre-commit + CI validation | Add the `claude-plugin-validate` hook to `.pre-commit-config.yaml` under the `repo: local` block, gated on `^(\.claude-plugin/\|integrations/claude/)`, with `entry: bash -c 'claude plugin validate . --strict && claude plugin validate ./integrations/claude --strict'`. Mirror the check in CI: add a `claude_plugin` path filter to `.github/workflows/pr.yml` (matching `.claude-plugin/**` and `integrations/claude/**`), pass it through to the `lint` reusable, and add a `claude_plugin_validate` job in `.github/workflows/lint.yml` that installs `actions/setup-node` + `npm install -g @anthropic-ai/claude-code@2.1.158`, then runs the same two validator invocations. | `pre-commit run claude-plugin-validate --all-files` passes. A staged malformed `marketplace.json` blocks `git commit` with a schema error. The hook does not run when only unrelated files are staged. The CI job runs on PRs that touch the plugin or marketplace, fails on a malformed manifest, and does not run when only unrelated files change. | 3, 4 |
-| 6 | Plugin README | Add `integrations/claude/README.md` with four sections: (a) install (the `--sparse .claude-plugin` snippet and `/mcp` OAuth), (b) local test (how to run the plugin via `--plugin-dir` for development), (c) release (bump version, merge, tag), (d) troubleshooting (auto-update is off by default, manual `/plugin marketplace update`, how to report bugs). | A new contributor can follow the README to install the plugin, run it locally for development, and ship a new version without consulting other docs. | 4 |
-| 7 | Root README update | Update the install snippet to include `--sparse .claude-plugin` and add a short note on the lean-clone behavior. | Snippet runs end-to-end against a real Claude Code install. | 3 |
+| 6 | Plugin README | Add `integrations/claude/README.md` with four sections: (a) install (terminal CLI form `claude plugin marketplace add ... --sparse .claude-plugin` plus `/plugin install` + `/mcp` OAuth in Claude Code, with the slash-command marketplace add documented as a secondary path), (b) local test (how to run the plugin via `--plugin-dir` for development), (c) release (bump version, merge, tag), (d) troubleshooting (auto-update is off by default, manual `/plugin marketplace update`, how to report bugs). | A new contributor can follow the README to install the plugin, run it locally for development, and ship a new version without consulting other docs. | 4 |
+| 7 | Root README update | Use the terminal CLI form (`claude plugin marketplace add ... --sparse .claude-plugin`) for the marketplace add and the slash command for install + `/mcp`. Link to `integrations/claude/README.md` for full install, troubleshooting, and release details. | Snippet runs end-to-end against a real Claude Code install. | 3 |
 
 ```mermaid
 graph TD

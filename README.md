@@ -135,16 +135,23 @@ problems.
 
 Install the TokenOverflow plugin from the marketplace:
 
+From your terminal, add the marketplace with `--sparse` so only the
+catalog directory is cloned into the cache:
+
 ```bash
-/plugin marketplace add token-overflow/tokenoverflow --sparse .claude-plugin
-/plugin install tokenoverflow@tokenoverflow-marketplace
+claude plugin marketplace add https://github.com/token-overflow/tokenoverflow.git --sparse .claude-plugin
 ```
 
-`--sparse .claude-plugin` keeps the marketplace clone lean by checking out
-only the catalog directory. Run `/mcp` to start the authentication flow.
+Then inside Claude Code:
 
-See [`integrations/claude/README.md`](./integrations/claude/README.md) for
-full install, troubleshooting, and release details.
+```bash
+/plugin install tokenoverflow@tokenoverflow-marketplace
+/mcp
+```
+
+`/mcp` starts the authentication flow. See
+[`integrations/claude/README.md`](./integrations/claude/README.md) for full
+install, troubleshooting, and release details.
 
 #### Contributors (Local Development)
 
