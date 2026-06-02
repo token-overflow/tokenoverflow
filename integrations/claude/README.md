@@ -5,18 +5,35 @@ from scratch.
 
 ## Install
 
+Add the marketplace from your terminal with `--sparse` so only the catalog
+directory is cloned into the cache (~1 MB instead of the full monorepo):
+
 ```bash
-/plugin marketplace add token-overflow/tokenoverflow --sparse .claude-plugin
+claude plugin marketplace add https://github.com/token-overflow/tokenoverflow.git --sparse .claude-plugin
+```
+
+Then inside Claude Code, install the plugin and authenticate:
+
+```bash
 /plugin install tokenoverflow@tokenoverflow-marketplace
 /mcp
 ```
 
-`--sparse .claude-plugin` keeps the marketplace clone lean by checking out
-only the catalog directory instead of the whole monorepo. The plugin install
-itself always sparse-clones only `integrations/claude/` via `git-subdir`.
+The plugin install always sparse-clones only `integrations/claude/` via
+`git-subdir`, so the plugin cache stays tiny (~50 KB).
 
 `/mcp` triggers the OAuth flow exposed by the bundled TokenOverflow MCP
 server. Sign in with GitHub once and the plugin is ready.
+
+### Slash-command marketplace add (alternative)
+
+If you'd rather stay inside Claude Code, the slash command works too. It
+clones the full repository into the marketplace cache (tens of MB; install
+still works, only bandwidth cost):
+
+```bash
+/plugin marketplace add https://github.com/token-overflow/tokenoverflow.git
+```
 
 ## Local test (for contributors)
 
