@@ -33,6 +33,23 @@ use crate::services::repository::{
     PgUserRepository, PgWaitlistRepository,
 };
 
+/// Build the MCP transport's `Host` allow-list from the environment's base URL.
+pub fn mcp_allowed_hosts(base_url: &str) -> Vec<String> {
+    let mut hosts = vec![
+        "localhost".to_string(),
+        "127.0.0.1".to_string(),
+        "::1".to_string(),
+    ];
+    if let Some(host) = base_url
+        .parse::<http::Uri>()
+        .ok()
+        .and_then(|uri| uri.host().map(str::to_owned))
+    {
+        hosts.push(host);
+    }
+    hosts
+}
+
 // Tokio runtime bootstrap — needs a running server to exercise.
 // E2E: tests/e2e/api/ exercises the full server via Docker Compose.
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -53,7 +70,8 @@ async fn async_run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mcp_app_state = app_state.clone();
     let mcp_config = StreamableHttpServerConfig::default()
         .with_stateful_mode(false)
-        .with_json_response(true);
+        .with_json_response(true)
+        .with_allowed_hosts(mcp_allowed_hosts(&config.api.base_url));
     let mcp_service = StreamableHttpService::new(
         move || Ok(TokenOverflowServer::new(mcp_app_state.clone())),
         Arc::new(NeverSessionManager::default()),
