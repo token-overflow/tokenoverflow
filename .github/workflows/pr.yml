@@ -188,7 +188,11 @@ jobs:
   # Same-repo only: forks cannot write to GHCR via `secrets.GITHUB_TOKEN`.
   docker_build:
     needs: [ prepare, lint, type_check, unit_test, integration_test, security_audit ]
-    if: needs.prepare.outputs.docker_build_needed == 'true'
+    if: >-
+      always() &&
+      needs.prepare.outputs.docker_build_needed == 'true' &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
     # Job-level permissions override the workflow-level ceiling so the called
     # reusable can declare `packages: write` without it being capped to `none`.
     permissions:
@@ -200,7 +204,10 @@ jobs:
   # Same-repo only: forks cannot pull from GHCR via `secrets.GITHUB_TOKEN`.
   e2e_test:
     needs: [ prepare, docker_build ]
-    if: needs.prepare.outputs.e2e_test_needed == 'true'
+    if: >-
+      always() &&
+      needs.prepare.outputs.e2e_test_needed == 'true' &&
+      needs.docker_build.result == 'success'
     permissions:
       contents: read
       packages: read
