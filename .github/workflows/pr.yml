@@ -67,7 +67,8 @@ jobs:
               - 'apps/api/**/!(*.md|*.mdx)'
               - 'apps/embedding_service/**/!(*.md|*.mdx)'
               - 'apps/so_tag_sync/**/!(*.md|*.mdx)'
-              - 'integrations/**'
+              - 'integrations/**/!(*.md|*.mdx)'
+              - 'integrations/claude/instructions.md'
               - 'Cargo.toml'
               - 'Cargo.lock'
             ts:
